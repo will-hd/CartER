@@ -280,13 +280,15 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
         screen_width = 600
         screen_height = 400
 
-        world_width = abs(self.world_size[0] - self.world_size[1])
+        world_width = abs(self.world_size[0] - self.world_size[1]) # world size 5
         scale = screen_width / world_width
 
         carty = 100  # TOP OF CART
         cartwidth = scale * 1.0
         cartheight = scale * 0.6
 
+        # Cart starts at 'world position' 0.5 (x=[0,1])
+        cartoffset = 0.5 
         polewidth = scale * 0.2
 
         axleoffset = cartheight / 4.0
@@ -333,7 +335,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
                 self.viewer.add_geom(cart)
                 self.viewer.add_geom(pole)
                 self.viewer.add_geom(axle)
-
+                
                 self.carts[agent.name] = cart
                 self.carttrans[agent.name] = carttrans
                 self.poles[agent.name] = pole
@@ -341,10 +343,29 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
                 self.polelens[agent.name] = polelen
                 self.axles[agent.name] = axle
 
-            track = rendering.Line((0, carty), (screen_width, carty))
+            track = rendering.Line((0, carty), (screen_width, carty)) # track length is 0.98 for sinusoidal map
             track.set_color(0, 0, 0)
 
+            # Failure positions: +/- half a unit from centre
+            boundaryleft = rendering.Line(
+                (screen_width/2-0.5*scale, carty+100), (screen_width/2-0.5*scale, -carty-100)
+            )
+            boundaryleft.set_color(0, 0, 0)
+
+            boundaryright = rendering.Line(
+                (screen_width/2+0.5*scale, carty+100),(screen_width/2+0.5*scale, -carty-100)
+            )
+            boundaryright.set_color(0, 0, 0)
+
+            centreline = rendering.Line(
+                (screen_width/2, carty+100), (screen_width/2, -carty-100)
+            )
+            centreline.set_color(0, 0, 0)
+
             self.viewer.add_geom(track)
+            self.viewer.add_geom(boundaryleft)
+            self.viewer.add_geom(boundaryright)
+            self.viewer.add_geom(centreline)
 
         if self.state is None:
             return None
@@ -357,7 +378,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
             agent = self.name_to_agent[agent_name]
             state = agent.observe_as_dict()
 
-            cartx = state["x"] * scale + screen_width / 2.0  # MIDDLE OF CART
+            cartx = (state["x"] - cartoffset) * scale + screen_width / 2.0  # MIDDLE OF CART
             self.carttrans[agent_name].set_translation(cartx, carty)
 
         for agent_name, pole in self.poles.items():
