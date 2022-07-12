@@ -7,9 +7,9 @@ from commander.ml.agent.agent import (
 )
 from commander.ml.agent.goal import AgentGoalMixinBase, AgentSwingupGoalMixin, AgentTimeGoalMixin
 from commander.ml.agent.state_specification import (
-    AgentPositionalKnowledgeStateSpecification,
-    AgentStateSpecificationBase,
-    AgentTotalKnowledgeStateSpecification,
+    AgentPositionalKnowledgeStateSpecMixin,
+    AgentStateSpecBaseMixin,
+    AgentTotalKnowledgeStateSpecMixin,
 )
 
 
@@ -17,7 +17,7 @@ from commander.ml.agent.state_specification import (
 # See: https://github.com/python/mypy/issues/5374
 def make_agent(
     agent: Any,
-    state_spec: Type[AgentStateSpecificationBase],
+    state_spec: Type[AgentStateSpecBaseMixin],
     goal: Any,
     *args: Any,
     **kwargs: Any,
@@ -36,7 +36,7 @@ __all__ = (
     "AgentGoalMixinBase",
     "AgentTimeGoalMixin",
     "AgentSwingupGoalMixin",
-    "AgentStateSpecificationBase",
-    "AgentTotalKnowledgeStateSpecification",
-    "AgentPositionalKnowledgeStateSpecification",
+    "AgentStateSpecBaseMixin",
+    "AgentTotalKnowledgeStateSpecMixin",
+    "AgentPositionalKnowledgeStateSpecMixin",
 )

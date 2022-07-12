@@ -10,7 +10,7 @@ import numpy as np
 
 from commander.ml.agent.agent import CartpoleAgent
 from commander.ml.agent.goal import AgentGoalMixinBase
-from commander.ml.agent.state_specification import AgentStateSpecificationBase
+from commander.ml.agent.state_specification import AgentStateSpecBaseMixin
 from commander.ml.agent.type_aliases import GoalParams
 from commander.network.constants import DEFAULT_BAUDRATE, DEFAULT_PORT
 
@@ -25,7 +25,7 @@ class AgentConfiguration(TypedDict, total=False):
 
     agent: Type[CartpoleAgent]
     goal: Type[AgentGoalMixinBase]
-    state_spec: Type[AgentStateSpecificationBase]
+    state_spec: Type[AgentStateSpecBaseMixin]
 
 
 class SimulatedConfiguration(Configuration):

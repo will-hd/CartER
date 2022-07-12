@@ -22,7 +22,7 @@ from commander.type_aliases import ExternalState, InternalState
 _FLOAT_MAX = np.finfo(FLOAT_TYPE).max
 
 
-class AgentStateSpecificationBase(ABC):
+class AgentStateSpecBaseMixin(ABC):
     """
     Mixin that defines what an idealised world state looks like
     as well as how this is observed, perhaps not ideally, by an agent.
@@ -76,7 +76,7 @@ class AgentStateSpecificationBase(ABC):
         ...
 
 
-class AgentTotalKnowledgeStateSpecification(AgentStateSpecificationBase):
+class AgentTotalKnowledgeStateSpecMixin(AgentStateSpecBaseMixin):
     """
     This mixin gives the agent full, perfect knowledge of the underlying world state.
 
@@ -118,7 +118,7 @@ class AgentTotalKnowledgeStateSpecification(AgentStateSpecificationBase):
         return internal_state
 
 
-class AgentPositionalKnowledgeStateSpecification(AgentStateSpecificationBase):
+class AgentPositionalKnowledgeStateSpecMixin(AgentStateSpecBaseMixin):
     """
     This mixin gives the agent limited knowledge of the system and indeed
     a single observation does not fully describe the system in a way
@@ -160,8 +160,8 @@ class AgentPositionalKnowledgeStateSpecification(AgentStateSpecificationBase):
 
 
 def make_state_spec(
-    state_spec: Type[AgentStateSpecificationBase], internal_state_idx: Type[InternalStateIdx]
-) -> Type[AgentStateSpecificationBase]:
+    state_spec: Type[AgentStateSpecBaseMixin], internal_state_idx: Type[InternalStateIdx]
+) -> Type[AgentStateSpecBaseMixin]:
     state_spec.internal_state_idx = internal_state_idx  # type: ignore[assignment]
 
     return state_spec
