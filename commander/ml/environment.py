@@ -193,7 +193,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
         agents: Sequence[SimulatedCartpoleAgent],
         start_time: float = 0.0,  # s
         timestep: float = 0.02,  # s
-        world_size: tuple[float, float] = (-2.5, 2.5),
+        world_size: tuple[float, float] = (-0.5, 0.5),
     ) -> None:
         self.start_time = start_time
         self.timestep = timestep
@@ -283,13 +283,14 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
         world_width = abs(self.world_size[0] - self.world_size[1]) # world size 5
         scale = screen_width / world_width
 
-        carty = 100  # TOP OF CART
-        cartwidth = scale * 1.0
-        cartheight = scale * 0.6
+        carty = 150  # TOP OF CART
+        cartwidth = scale * 0.2
+        cartheight = scale * 0.1
 
         # Cart starts at 'world position' 0.5 (x=[0,1])
-        cartoffset = 0.5 
-        polewidth = scale * 0.2
+        cartoffset = 0.5
+
+        polewidth = scale * 0.02
 
         axleoffset = cartheight / 4.0
 
@@ -310,7 +311,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
                 carttrans = rendering.Transform()
 
                 # Pole
-                polelen = scale * (2 * agent.pole_length)
+                polelen = scale * (0.4 * agent.pole_length)
                 l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
                 pole = rendering.FilledPolygon([(l, b), (l, t), (r, t), (r, b)])
                 poletrans = rendering.Transform(translation=(0, axleoffset))
@@ -343,7 +344,8 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
                 self.polelens[agent.name] = polelen
                 self.axles[agent.name] = axle
 
-            track = rendering.Line((0, carty), (screen_width, carty)) # track length is 0.98 for sinusoidal map
+            # NB: track length is 0.98 potential goal spec
+            track = rendering.Line((0, carty), (screen_width, carty)) 
             track.set_color(0, 0, 0)
 
             # Failure positions: +/- half a unit from centre
