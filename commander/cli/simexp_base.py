@@ -58,8 +58,10 @@ class SimulationExperimentCommand(str, Enum):
 class Algorithm(str, Enum):
     # Note: Not all of these actually work with our action space and multiple agents
     # Known working: A2C, PPO
+    # Now testing DQN
     A2C = "A2C"
     PPO = "PPO"
+    DQN = "DQN"
 
 
 ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
@@ -74,6 +76,16 @@ ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
         "clip_range": lambda x: 0.2 * x,
     },
     Algorithm.A2C: {},
+    Algorithm.DQN: {
+        "learning_rate": 0.0001, 
+        "buffer_size": 1000000, 
+        "learning_starts": 50000, 
+        "batch_size": 32, 
+        "tau": 1.0, 
+        "gamma": 0.99, 
+        "train_freq": 4, 
+        "gradient_steps": 1
+    }
 }
 
 
