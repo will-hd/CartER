@@ -130,7 +130,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
     @click.option("--render/--no-render", default=True)
     @click.option("--render-with-best/--no-render-with-best", default=True)
     @click.option("--tensorboard/--no-tensorboard", default=True)
-    @click.option("--record/--no-record", default=True)
+    @click.option("--record/--no-record", default=False)
     @click.option("-t", "--total-timesteps", type=int, default=100000)
     @click.option(
         "-c",
@@ -336,69 +336,70 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
             else:
                 model.save(model_path)
 
-        if render:
-            sim_env_params = env_params.copy()
-            sim_env_params.pop("port", None)
+        if command is SimulationExperimentCommand.SIMULATE:
+            if render:
+                sim_env_params = env_params.copy()
+                sim_env_params.pop("port", None)
 
-            env = make_sb3_env(SimulatedCartpoleEnv, **sim_env_params)
-            env.reset()
+                env = make_sb3_env(SimulatedCartpoleEnv, **sim_env_params)
+                env.reset()
 
-            root_env = get_sb3_env_root_env(env)
+                root_env = get_sb3_env_root_env(env)
 
-            if render_with_best:
-                render_model_path = best_model_path / "best_model"
-            else:
-                render_model_path = model_path
+                if render_with_best:
+                    render_model_path = best_model_path / "best_model"
+                else:
+                    render_model_path = model_path
 
-            model = algorithm_obj.load(render_model_path)
-
-            if record:
-                fig = plt.figure()
-                images = []
-
-            obs = env.reset()
-            done = False
-            total_rewards = {agent: 0.0 for agent in root_env.agents}
-
-            while not done:
-                actions, states = model.predict(obs)
-
-                step_return = env.step(actions)
-                observations, rewards, dones, infos = restore_step(env, step_return)
-                obs = vectorise_observations(observations)
-
-                for (agent, reward) in rewards.items():
-                    total_rewards[agent] += reward
-
-                done = any(dones.values())
+                model = algorithm_obj.load(render_model_path)
 
                 if record:
-                    image = plt.imshow(env.render(mode="rgb_array"), animated=True)
-                    plt.axis("off")
-                    plt.title("CartER Simulation")
+                    fig = plt.figure()
+                    images = []
 
-                    images.append([image])
+                obs = env.reset()
+                done = False
+                total_rewards = {agent: 0.0 for agent in root_env.agents}
 
-                else:
-                    env.render()
+                while not done:
+                    actions, states = model.predict(obs)
 
-                if done:
-                    logger.info(f"Rewards: {total_rewards}")
-                    env.close()
+                    step_return = env.step(actions)
+                    observations, rewards, dones, infos = restore_step(env, step_return)
+                    obs = vectorise_observations(observations)
+
+                    for (agent, reward) in rewards.items():
+                        total_rewards[agent] += reward
+
+                    done = any(dones.values())
 
                     if record:
-                        print("Saving animation...")
-                        ani = animation.ArtistAnimation(
-                            fig,
-                            images,
-                            interval=root_env.timestep * 1000,
-                            blit=True,
-                            repeat_delay=1000,
-                        )
+                        image = plt.imshow(env.render(mode="rgb_array"), animated=True)
+                        plt.axis("off")
+                        plt.title("CartER Simulation")
 
-                        writer = FFMpegWriter(fps=30)
+                        images.append([image])
 
-                        ani.save(f"{animation_path}", dpi=200, writer=writer)
-                        print(f"Animation saved as {animation_path}")
+                    else:
+                        env.render()
+
+                    if done:
+                        logger.info(f"Rewards: {total_rewards}")
+                        env.close()
+
+                        if record:
+                            print("Saving animation...")
+                            ani = animation.ArtistAnimation(
+                                fig,
+                                images,
+                                interval=root_env.timestep * 1000,
+                                blit=True,
+                                repeat_delay=1000,
+                            )
+
+                            writer = FFMpegWriter(fps=30)
+
+                            ani.save(f"{animation_path}", dpi=200, writer=writer)
+                            print(f"Animation saved as {animation_path}")
 
     return inner
