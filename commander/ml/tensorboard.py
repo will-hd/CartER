@@ -102,6 +102,10 @@ class GeneralCarterCallback(BaseCallback):
             if info.get("theta") is not None:
                 self.logger.record(f"carter/theta_{name}", info["theta"])
 
+            # dx
+            if info.get("dx") is not None:
+                self.logger.record(f"carter/dx_{name}", info["dx"])
+
         failure_mode: str
         if not failure_modes:
             return True

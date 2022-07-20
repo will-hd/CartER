@@ -1,7 +1,8 @@
 from enum import IntEnum, unique
 from typing import TypedDict, Union
 
-
+# IntEnums that map a label to the appropriate
+# index of the `np.array` of the `observe` method.
 @unique
 class SimulatedInternalStateIdx(IntEnum):
     X = 0
@@ -9,15 +10,18 @@ class SimulatedInternalStateIdx(IntEnum):
     THETA = 2
     DTHETA = 3
 
-
 @unique
-class ExperimentalInternalStateIdx(IntEnum):
+class ExperimentalPositionalInternalStateIdx(IntEnum):
     X = 0
     THETA = 1
 
+@unique
+class ExperimentalTotalLinearInternalStateIdx(IntEnum):
+    X = 0
+    DX = 1
 
-InternalStateIdx = Union[SimulatedInternalStateIdx, ExperimentalInternalStateIdx]
-
+# Typealiases for state index IntEnums
+InternalStateIdx = Union[SimulatedInternalStateIdx, ExperimentalPositionalInternalStateIdx, ExperimentalTotalLinearInternalStateIdx]
 ExternalTotalKnowledgeStateIdx = SimulatedInternalStateIdx
 
 
@@ -25,6 +29,11 @@ ExternalTotalKnowledgeStateIdx = SimulatedInternalStateIdx
 class ExternalPositionalKnowlegeStateIdx(IntEnum):
     X = 0
     THETA = 1
+
+@unique
+class ExternalTotalLinearKnowlegeStateIdx(IntEnum):
+    X = 0
+    DX = 1
 
 
 ExternalStateIdx = Union[ExternalTotalKnowledgeStateIdx, ExternalPositionalKnowlegeStateIdx]

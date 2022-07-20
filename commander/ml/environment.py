@@ -688,8 +688,9 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         self.wait_for_settled()
 
         # Gets angle wander for each cart
-        for agent in self.get_agents():
-            self.environment_state["angle_drifts"][agent.name] = agent.get_angle_drift()
+
+        # for agent in self.get_agents():
+        #     self.environment_state["angle_drifts"][agent.name] = agent.get_angle_drift()
 
         # Check limits
         logger.info("Checking limits")
@@ -717,8 +718,8 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         # Process final packets
         self.network_tick()
 
-        for agent_name, angle_drift in self.environment_state["angle_drifts"].items():
-            infos[agent_name]["angle_drift"] = angle_drift
+        # for agent_name, angle_drift in self.environment_state["angle_drifts"].items():
+        #     infos[agent_name]["angle_drift"] = angle_drift
 
         for agent_name, position_drift in self.environment_state["position_drifts"].items():
             infos[agent_name]["position_drift"] = position_drift
@@ -783,7 +784,9 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
             ] = agent.last_observation_time
 
             info["x"] = observation_dict["x"]
-            info["theta"] = observation_dict["theta"]
+            info["dx"] = observation_dict["dx"]
+            # info["x"] = observation_dict["x"]
+            # info["theta"] = observation_dict["theta"]
             info["agent_name"] = agent.name
             info["environment_episode"] = self.episode
             info["available_memory"] = self.environment_state["available_memory"]
@@ -832,8 +835,9 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 def make_env(base_env: Type[EnvT], *args: Any, num_frame_stacking: int = 1, **kwargs: Any) -> EnvT:
     env = base_env(*args, **kwargs)
 
-    env = ss.frame_stack_v1(env, stack_size=num_frame_stacking)
-    env = ss.black_death_v2(env)
+    # Testing without wrappers while not using angle/theta
+    # env = ss.frame_stack_v1(env, stack_size=num_frame_stacking)
+    # env = ss.black_death_v2(env)
 
     return env
 
@@ -857,6 +861,11 @@ def make_sb3_env(
 
 
 def get_sb3_env_root_env(env: VecMonitor) -> EnvT:
-    root_env = cast(Any, env).unwrapped.par_env.unwrapped.env
+    try:
+        # root_env = cast(Any, env).unwrapped.par_env.unwrapped.env
+        root_env = cast(Any, env).unwrapped.par_env
+    except:
+        logger.debug("Nothing to unwrap")
+
 
     return cast(EnvT, root_env)

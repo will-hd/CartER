@@ -75,13 +75,14 @@ class AgentRewardPotentialGoalMixin(AgentGoalMixinBase):
 
     def _check_state(self, state: ExternalState) -> StateChecks:
         x = state[self.external_state_idx.X]
-        theta = state[self.external_state_idx.THETA]
+        # theta = state[self.external_state_idx.THETA]
 
         checks = {
             FailureDescriptors.POSITION_LEFT: x < self.failure_position[0],
             FailureDescriptors.POSITION_RIGHT: x > self.failure_position[1],
-            FailureDescriptors.ANGLE_RIGHT: theta < self.failure_angle[0],
-            FailureDescriptors.ANGLE_LEFT: theta > self.failure_angle[1],
+            # removed while angle not being used
+            # FailureDescriptors.ANGLE_RIGHT: theta < self.failure_angle[0],
+            # FailureDescriptors.ANGLE_LEFT: theta > self.failure_angle[1],
         }
 
         return checks

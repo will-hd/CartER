@@ -319,16 +319,46 @@ class DoJigglePacket(OnlyIDPacket):
     id_ = byte(0xA7)  # § (section)
 
 
+# class ObservationPacket(InboundPacket):
+#     id_ = byte(0x40)  # @
+
+#     def __init__(
+#         self, timestamp_micros: int, cart_id: CartID, position_steps: int, angle: float, actions_done_counter: int
+#     ) -> None:
+#         self.timestamp_micros = timestamp_micros
+#         self.cart_id = cart_id
+#         self.position_steps = position_steps
+#         self.angle = angle
+#         self.actions_done_counter = actions_done_counter
+
+#     @classmethod
+#     def _read(cls, serial: Serial) -> ObservationPacket:
+#         timestamp_micros = unpack(Format.UINT_32, serial)
+#         cart_id = CartID(unpack(Format.UINT_8, serial))
+#         position_steps = unpack(Format.INT_32, serial)
+#         angle = unpack(Format.FLOAT_32, serial)
+#         actions_done_counter = unpack(Format.UINT_32, serial)
+
+#         # Since angle unused currently, use it as another packet ID
+
+#         return cls(
+#             timestamp_micros=timestamp_micros,
+#             cart_id=cart_id,
+#             position_steps=position_steps,
+#             angle=angle,
+#             actions_done_counter = actions_done_counter
+#         )
+
 class ObservationPacket(InboundPacket):
     id_ = byte(0x40)  # @
 
     def __init__(
-        self, timestamp_micros: int, cart_id: CartID, position_steps: int, angle: float, actions_done_counter: int
+        self, timestamp_micros: int, cart_id: CartID, position_steps: int, velocity: float, actions_done_counter: int
     ) -> None:
         self.timestamp_micros = timestamp_micros
         self.cart_id = cart_id
         self.position_steps = position_steps
-        self.angle = angle
+        self.velocity = velocity
         self.actions_done_counter = actions_done_counter
 
     @classmethod
@@ -336,7 +366,7 @@ class ObservationPacket(InboundPacket):
         timestamp_micros = unpack(Format.UINT_32, serial)
         cart_id = CartID(unpack(Format.UINT_8, serial))
         position_steps = unpack(Format.INT_32, serial)
-        angle = unpack(Format.FLOAT_32, serial)
+        velocity = unpack(Format.FLOAT_32, serial)
         actions_done_counter = unpack(Format.UINT_32, serial)
 
         # Since angle unused currently, use it as another packet ID
@@ -345,7 +375,7 @@ class ObservationPacket(InboundPacket):
             timestamp_micros=timestamp_micros,
             cart_id=cart_id,
             position_steps=position_steps,
-            angle=angle,
+            velocity=velocity,
             actions_done_counter = actions_done_counter
         )
 
