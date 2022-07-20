@@ -29,6 +29,9 @@ extern bool is_observing;
 extern bool limit_finding_has_been_done;
 extern bool experiment_done;
 
+extern float_t id_tracker;
+extern uint32_t Actions_Done_Counter; //global
+
 // Networking
 const unsigned int BAUDRATE = 115200;
 // Can't get higher rates to work on Due due to a bug in the firmware :(

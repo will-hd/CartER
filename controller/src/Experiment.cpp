@@ -54,11 +54,13 @@ void send_observation(uint8_t cart_id)
     int32_t position_step = astepper.currentPosition();
 
     CustomAMS_5600 *rot_encoder = get_rot_encoder_by_id(cart_id);
-    float_t angle_deg = rot_encoder->readAngleDeg();
+    // repurposed as packet id for now
+    float_t angle_deg = id_tracker; // rot_encoder->readAngleDeg();
+    uint32_t actions_done_counter = Actions_Done_Counter;
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
 
-    packet->construct(timestamp_micros, cart_id, position_step, angle_deg);
+    packet->construct(timestamp_micros, cart_id, position_step, angle_deg, actions_done_counter);
 
     packet_sender.send(std::move(packet));
 }
@@ -66,7 +68,7 @@ void send_observation(uint8_t cart_id)
 void experiment_start()
 {
     packet_sender.send_debug("Starting experiment...");
-
+    id_tracker = 0;
     asteppers_stop();
 
     experiment_mode = ExperimentMode::RUNNING;

@@ -109,7 +109,19 @@ void PacketReactor::tick()
         {
 
             CustomAccelStepper &astepper = get_astepper_by_id(packet->cart_id);
-
+            
+            // Send id of recived action with observation to see if they match
+            id_tracker = packet->actobs_tracker;
+            if (Actions_Done_Counter < 4294967295)
+            {
+                Actions_Done_Counter++;
+            }
+            else
+            {
+                Actions_Done_Counter = 0;
+            }
+            
+            
             switch (packet->operation)
             {
             case SetOperation::ADD:

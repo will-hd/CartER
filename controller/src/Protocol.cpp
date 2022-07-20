@@ -105,6 +105,7 @@ void SetQuantityBasePacket::read(Stream &sbuf)
     operation = static_cast<SetOperation>(operation_char);
     cart_id = read_uint8(sbuf);
     value = read_int16(sbuf);
+    actobs_tracker = read_uint8(sbuf);
 }
 
 // SetPosition
@@ -136,15 +137,16 @@ DoJigglePacket::DoJigglePacket() {}
 byte DoJigglePacket::get_id() const { return DoJigglePacket::id; }
 
 // Observation
-ObservationPacket::ObservationPacket() : _timestamp_micros{0}, _cart_id{0}, _position_steps{0}, _angle_degs{0.0} {}
+ObservationPacket::ObservationPacket() : _timestamp_micros{0}, _cart_id{0}, _position_steps{0}, _angle_degs{0.0}, _actions_done_counter{0}{}
 byte ObservationPacket::get_id() const { return ObservationPacket::id; }
 
-void ObservationPacket::construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t angle_degs)
+void ObservationPacket::construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t angle_degs, uint32_t actions_done_counter)
 {
     _timestamp_micros = timestamp_micros;
     _cart_id = cart_id;
     _position_steps = position_steps;
     _angle_degs = angle_degs;
+    _actions_done_counter = actions_done_counter;
 }
 
 RawPacket ObservationPacket::to_raw_packet() const
@@ -157,6 +159,7 @@ RawPacket ObservationPacket::to_raw_packet() const
     raw_packet.add(this->_cart_id);
     raw_packet.add(this->_position_steps);
     raw_packet.add(this->_angle_degs);
+    raw_packet.add(this->_actions_done_counter);
 
     return raw_packet;
 }

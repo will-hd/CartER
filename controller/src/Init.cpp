@@ -18,6 +18,9 @@ PacketSender packet_sender = PacketSender(S);
 bool experiment_done = false;
 bool limit_finding_has_been_done = false;
 bool is_observing = false;
+float_t id_tracker = 0;
+uint32_t Actions_Done_Counter = 0;
+
 
 FailureMode failure_mode = FailureMode::NUL;
 uint8_t failure_cart_id = 0;
