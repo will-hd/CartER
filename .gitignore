@@ -31,3 +31,17 @@ logs/*.log
 
 # Profiling
 profiling.prof
+
+# Misc
+misc/
+
+# notebooks (temporary)
+notebooks/
+# scripts
+scripts/
+
+# interesting logs
+interesting_logs/ 
+
+# work-space files
+.code-workspace
