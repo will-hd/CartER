@@ -396,6 +396,10 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         self.network_manager = NetworkManager(port=self.port, baudrate=self.baudrate)
 
+        # This NetworkManager points to the Native USB Serial port.
+        # It only opened and closed, to trigger DTR reset on arduino.
+        self.network_reseter = NetworkManager(port="/dev/ttyACM0")
+
         super().__init__(agents=agents)
 
     def _distribute_packet(self, packet: CartSpecificPacket) -> None:
@@ -521,6 +525,10 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         logger.info("Opening serial connection to controller")
         self.network_manager.open()
+        # DTR arduino reset
+        self.network_reseter.open()
+        logger.info("Opening and closing Native Serial USB port /dev/ttyACM0 to trigger DTR reset")
+        self.network_reseter.close()
         logger.info("Reading inital output")
         initial_output = self.network_manager.read_initial_output(print_=True)
         logger.debug("Initial output: %s", initial_output)
