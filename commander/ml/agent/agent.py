@@ -302,7 +302,6 @@ class SimulatedCartpoleAgent(CartpoleAgent):
         max_steps: int = 2500,
         goal_params: Optional[GoalParams] = None,
     ) -> None:
-
         self.grav_acc = grav_acc
 
         self.mass_cart = mass_cart
@@ -325,6 +324,11 @@ class SimulatedCartpoleAgent(CartpoleAgent):
 
         self.integrator = integrator
         self.integration_resolution = integration_resolution
+
+        # Position and velocity of cartpole agent
+        self._position = 0
+        self._velocity = 0
+        self.action_history = []
 
         super().__init__(
             name=name, pole_length=pole_length, max_steps=max_steps, goal_params=goal_params
@@ -371,6 +375,8 @@ class SimulatedCartpoleAgent(CartpoleAgent):
                 ),
             ],
         )
+        
+        self._position, self._velocity = (self._state[0], self._state[1])
 
         self.derivatives_wrapper.reset()
 
@@ -392,20 +398,40 @@ class SimulatedCartpoleAgent(CartpoleAgent):
         These can then be numerically integrated to update the environment
         based on the action.
         """
+        use_force_method = False
+
         if not self.action_space.contains(action):
-            raise ValueError(f"Action {action} not in action space. Invalid.")
+                raise ValueError(f"Action {action} not in action space. Invalid.")
+        logger.debug(action)
+        self._state = self._move(action)
 
-        # Resolve direction of force
-        force = self.force_mag if action == 1 else -self.force_mag
+        if use_force_method:
 
-        # Update state
-        self._state = self._integrate(
-            IntegratorOptions.RK45, (0, self.tau), self.tau / self.integration_resolution, force
-        )
+            # Resolve direction of force
+            force = self.force_mag if action == 1 else -self.force_mag
 
+            # Update state
+            self._state = self._integrate(
+                IntegratorOptions.RK45, (0, self.tau), self.tau / self.integration_resolution, force
+            )
+            
         info: StepInfo = {}
 
         return info
+    
+    def _move(self, action: Action) -> InternalState:
+        # Increment in position
+
+        value = 0.01
+        if action == 0:
+            self._velocity += value
+        else:
+            self._velocity -= value   
+        ds = self.tau*self._velocity
+        self._position += ds
+
+        new_state = cast(InternalState, np.array([self._position, self._velocity, 0, 0], FLOAT_TYPE))
+        return new_state
 
     def _integrate(
         self, method: IntegratorOptions, t_span: tuple[float, float], t_step: float, force: float

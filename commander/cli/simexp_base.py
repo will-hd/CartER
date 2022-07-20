@@ -217,6 +217,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
 
         env_class: Union[Type[SimulatedCartpoleEnv], Type[ExperimentalCartpoleEnv]]
         agent_params: Union[ExperimentAgentConfiguration, SimulatedAgentConfiguration]
+
         if command is SimulationExperimentCommand.SIMULATE:
             env_class = SimulatedCartpoleEnv
 
