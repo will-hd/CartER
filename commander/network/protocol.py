@@ -224,10 +224,11 @@ class SetQuantityPacket(OutboundPacket):
     def __repr__(self) -> str:
         return _stringify_self(self)
 
-    def __init__(self, operation: SetOperation, cart_id: CartID, value: int) -> None:
+    def __init__(self, operation: SetOperation, cart_id: CartID, value: int, actobs_tracker: int) -> None:
         self.operation = operation
         self.cart_id = cart_id
         self.value = value
+        self.actobs_tracker = actobs_tracker 
 
     def to_bytes(self) -> bytes:
         bytes_ = b""
@@ -236,6 +237,7 @@ class SetQuantityPacket(OutboundPacket):
         bytes_ += pack(Format.ASCII_CHAR, self.operation.value)
         bytes_ += pack(Format.UINT_8, self.cart_id.value)
         bytes_ += pack(Format.INT_16, self.value)
+        bytes_ += pack(Format.UINT_8, self.actobs_tracker)
 
         return bytes_
 
@@ -321,12 +323,13 @@ class ObservationPacket(InboundPacket):
     id_ = byte(0x40)  # @
 
     def __init__(
-        self, timestamp_micros: int, cart_id: CartID, position_steps: int, angle: float
+        self, timestamp_micros: int, cart_id: CartID, position_steps: int, angle: float, actions_done_counter: int
     ) -> None:
         self.timestamp_micros = timestamp_micros
         self.cart_id = cart_id
         self.position_steps = position_steps
         self.angle = angle
+        self.actions_done_counter = actions_done_counter
 
     @classmethod
     def _read(cls, serial: Serial) -> ObservationPacket:
@@ -334,12 +337,16 @@ class ObservationPacket(InboundPacket):
         cart_id = CartID(unpack(Format.UINT_8, serial))
         position_steps = unpack(Format.INT_32, serial)
         angle = unpack(Format.FLOAT_32, serial)
+        actions_done_counter = unpack(Format.UINT_32, serial)
+
+        # Since angle unused currently, use it as another packet ID
 
         return cls(
             timestamp_micros=timestamp_micros,
             cart_id=cart_id,
             position_steps=position_steps,
             angle=angle,
+            actions_done_counter = actions_done_counter
         )
 
 

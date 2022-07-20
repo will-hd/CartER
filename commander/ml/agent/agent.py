@@ -457,8 +457,9 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         observation_maximum_interval: int = 10 * 1000,  # us
         action_minimum_interval: float = 0.003,  # s
         action_maximum_interval: float = 0.010,  # s
-        max_steps: int = 2500,
+        max_steps: int = 2500, # 2500
         goal_params: Optional[GoalParams] = None,
+        action_counter: int = 0
     ):
 
         self.cart_id = cart_id
@@ -472,6 +473,7 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         self.action_minimum_interval = action_minimum_interval
         self.action_maximum_interval = action_maximum_interval
         self.observation_maximum_interval = observation_maximum_interval
+        self.action_counter = action_counter
 
         super().__init__(name=name, max_steps=max_steps, goal_params=goal_params)
 
@@ -547,7 +549,7 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
                         theta,
                     )
                 )
-
+                # print(f"recieved actions_done_counter: {packet.actions_done_counter}")
                 self.observation_buffer.append(self.observe())
 
         else:
@@ -595,11 +597,18 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         self.last_action_time = time()
         self.action_freq_ticker.tick()
 
-        value = 50
+        value = 30# 50
 
         value *= 1 if action == Action.FORWARDS else -1
+        
+        rand_numb = np.random.randint(0, 255)
 
-        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=value)
+        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=value, actobs_tracker=rand_numb)
+        self.action_counter += 1
+
+        # logger.debug(f"actobs_tracker {rand_numb}")
+        # logger.debug(f"Commander action counter: {self.action_counter}")
+
         # pos_pkt = SetPositionPacket(SetOperation.ADD, cart_id=self.cart_id, value=value)
         # self.network_manager.send_packet(pos_pkt)
         self.network_manager.send_packet(velo_pkt)

@@ -153,6 +153,7 @@ public:
     SetOperation operation;
     uint8_t cart_id;
     int16_t value;
+    uint8_t actobs_tracker;
 
     SetQuantityBasePacket();
     using Packet::construct;
@@ -254,6 +255,7 @@ public:
     uint8_t _cart_id;
     int32_t _position_steps;
     float_t _angle_degs;
+    uint32_t _actions_done_counter;
 
     static const byte id = 0x40; // @
 
@@ -262,7 +264,7 @@ public:
 
     virtual byte get_id() const override;
 
-    virtual void construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t angle_degs);
+    virtual void construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t angle_degs, uint32_t actions_done_counter);
     virtual RawPacket to_raw_packet() const override;
 };
 

@@ -554,7 +554,7 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         # Set velocity
         logger.info("Setting velocity to zero")
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0)
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=0)
         self.network_manager.send_packet(velo_pkt)
 
         debug_info_pkt = RequestDebugInfoPacket()
@@ -584,12 +584,12 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         # Set max velocity
         logger.info("Setting max velocity")
-        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=10_000)
+        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=10_000, actobs_tracker=2)
         self.network_manager.send_packet(max_velo_pkt)
 
         # Set velocity
         logger.info("Setting velocity")
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0)
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=1)
         self.network_manager.send_packet(velo_pkt)
 
         # Ask controller to start experiment
@@ -625,7 +625,7 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         # Set velocity
         logger.info("Setting velocity")
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0)
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=3)
         self.network_manager.send_packet(velo_pkt)
 
         self.world_time_start = time()
@@ -744,6 +744,7 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
             dones[self.environment_state["failure_agent_name"]] = True
 
         while True and not self._has_failed():
+            # print("still in this loop")
             all_observations_are_new = all(
                 [
                     self.environment_state["last_observation_times"][agent.name]
