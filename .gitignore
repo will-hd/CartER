@@ -35,13 +35,13 @@ profiling.prof
 # Misc
 misc/
 
-<<<<<<< HEAD
 # notebooks (temporary)
 notebooks/
-=======
 # scripts
 scripts/
 
 # interesting logs
 interesting_logs/ 
->>>>>>> 4f613b86cc6fa10cdd9a3105d498bdc6fd74af18
+
+# work-space files
+.code-workspace
