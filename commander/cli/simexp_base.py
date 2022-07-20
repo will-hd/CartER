@@ -24,8 +24,8 @@ from commander.ml.agent.agent import ExperimentalCartpoleAgent
 from commander.ml.agent.constants import ExperimentalInternalStateIdx, SimulatedInternalStateIdx
 from commander.ml.agent.goal import AgentGoalMixinBase, AgentRewardPotentialGoalMixin
 from commander.ml.agent.state_specification import (
-    AgentPositionalKnowledgeStateSpecification,
-    AgentTotalKnowledgeStateSpecification,
+    AgentPositionalKnowledgeStateSpecMixin,
+    AgentTotalKnowledgeStateSpecMixin,
     make_state_spec,
 )
 from commander.ml.configurations import (
@@ -98,8 +98,8 @@ class ConfigurationStateSpec(str, Enum):
 
 
 CONFIGURATION_STATE_SPEC_MAP = {
-    "TOTAL_KNOWLEDGE": AgentTotalKnowledgeStateSpecification,
-    "POSITIONAL_KNOWLEDGE": AgentPositionalKnowledgeStateSpecification,
+    "TOTAL_KNOWLEDGE": AgentTotalKnowledgeStateSpecMixin,
+    "POSITIONAL_KNOWLEDGE": AgentPositionalKnowledgeStateSpecMixin,
 }
 
 
