@@ -60,6 +60,7 @@ class Algorithm(str, Enum):
     # Known working: A2C, PPO
     A2C = "A2C"
     PPO = "PPO"
+    DQN = "DQN"
 
 
 ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
@@ -74,6 +75,22 @@ ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
         "clip_range": lambda x: 0.2 * x,
     },
     Algorithm.A2C: {},
+    Algorithm.DQN: {
+        "learning_rate": 0.0001, 
+        "buffer_size": 1000000, 
+        "learning_starts": 50000, 
+        "batch_size": 32, 
+        "tau": 1.0, 
+        "gamma": 0.99, 
+        "train_freq": 4, 
+        "gradient_steps": 1,
+        "optimize_memory_usage": False, 
+        "target_update_interval": 10000, 
+        "exploration_fraction": 0.3, 
+        "exploration_initial_eps": 1.0, 
+        "exploration_final_eps": 0.1, 
+        "max_grad_norm": 10
+    }
 }
 
 
