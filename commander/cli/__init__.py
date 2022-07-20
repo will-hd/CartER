@@ -4,7 +4,7 @@ import click
 from mkdocs.__main__ import serve_command as docs
 
 from commander.cli.simexp_base import SimulationExperimentCommand, simexp_command
-from commander.cli.tensorboard import tensorboard
+from commander.cli.tensorboard_setup import tensorboard
 from commander.log import setup_logging
 
 docs.name = "docs"
