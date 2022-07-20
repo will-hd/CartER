@@ -125,7 +125,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
     @click.option("--render/--no-render", default=True)
     @click.option("--render-with-best/--no-render-with-best", default=True)
     @click.option("--tensorboard/--no-tensorboard", default=True)
-    @click.option("--record/--no-record", default=True)
+    @click.option("--record/--no-record", default=False)
     @click.option("-t", "--total-timesteps", type=int, default=100000)
     @click.option(
         "-c",
