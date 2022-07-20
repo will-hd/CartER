@@ -37,3 +37,6 @@ misc/
 
 # scripts
 scripts/
+
+# interesting logs
+interesting_logs/ 
