@@ -21,11 +21,17 @@ from commander.ml.agent import (
     make_agent,
 )
 from commander.ml.agent.agent import ExperimentalCartpoleAgent
-from commander.ml.agent.constants import ExperimentalInternalStateIdx, SimulatedInternalStateIdx
+from commander.ml.agent.constants import (
+    ExperimentalPositionalInternalStateIdx, 
+    SimulatedInternalStateIdx, 
+    ExperimentalTotalLinearInternalStateIdx
+)
+
 from commander.ml.agent.goal import AgentGoalMixinBase, AgentRewardPotentialGoalMixin
 from commander.ml.agent.state_specification import (
     AgentPositionalKnowledgeStateSpecMixin,
     AgentTotalKnowledgeStateSpecMixin,
+    AgentTotalLinearKnowledgeStateSpecMixin,
     make_state_spec,
 )
 from commander.ml.configurations import (
@@ -65,13 +71,13 @@ class Algorithm(str, Enum):
 
 ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
     Algorithm.PPO: {
-        "n_steps": 256,
-        "batch_size": 32,
+        "n_steps": 2048,
+        "batch_size": 128,
         "gae_lambda": 0.95,
         "gamma": 0.98,
         "n_epochs": 5,
         "ent_coef": 0.01,
-        "learning_rate": lambda x: 0.00002 * x,
+        "learning_rate": lambda x: 0.0000002 * x,
         "clip_range": lambda x: 0.2 * x,
     },
     Algorithm.A2C: {},
@@ -112,11 +118,13 @@ CONFIGURATION_GOAL_MAP: dict[str, Type[AgentGoalMixinBase]] = {
 class ConfigurationStateSpec(str, Enum):
     TOTAL_KNOWLEDGE = "TOTAL_KNOWLEDGE"
     POSITIONAL_KNOWLEDGE = "POSITIONAL_KNOWLEDGE"
+    TOTAL_LINEAR_KNOWLEDGE = "TOTAL_LINEAR_KNOWLEDGE"
 
 
 CONFIGURATION_STATE_SPEC_MAP = {
     "TOTAL_KNOWLEDGE": AgentTotalKnowledgeStateSpecMixin,
     "POSITIONAL_KNOWLEDGE": AgentPositionalKnowledgeStateSpecMixin,
+    "TOTAL_LINEAR_KNOWLEDGE": AgentTotalLinearKnowledgeStateSpecMixin
 }
 
 
@@ -131,7 +139,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
     @click.option("--render-with-best/--no-render-with-best", default=True)
     @click.option("--tensorboard/--no-tensorboard", default=True)
     @click.option("--record/--no-record", default=False)
-    @click.option("-t", "--total-timesteps", type=int, default=100000)
+    @click.option("-t", "--total-timesteps", type=int, default=1000000*4)
     @click.option(
         "-c",
         "--carts",
@@ -148,7 +156,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
         "-s",
         "--state-spec",
         type=click.Choice([_.value for _ in ConfigurationStateSpec], case_sensitive=False),
-        default=ConfigurationStateSpec.POSITIONAL_KNOWLEDGE,
+        default=ConfigurationStateSpec.TOTAL_LINEAR_KNOWLEDGE,
     )
     @click.option(
         "-a",
@@ -191,7 +199,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
             raise NotImplementedError
 
         if num_frame_stacking == -1:
-            num_frame_stacking = 1 if state_spec == ConfigurationStateSpec.TOTAL_KNOWLEDGE else 4
+            num_frame_stacking = 1 if state_spec == ConfigurationStateSpec.TOTAL_KNOWLEDGE or state_spec == ConfigurationStateSpec.TOTAL_LINEAR_KNOWLEDGE else 4
 
         _experiment_name_partials = [
             command,
@@ -254,7 +262,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
             agent_params["goal"] = CONFIGURATION_GOAL_MAP[goal]
             agent_params["state_spec"] = make_state_spec(
                 CONFIGURATION_STATE_SPEC_MAP[state_spec],  # type: ignore [misc]
-                ExperimentalInternalStateIdx,
+                ExperimentalTotalLinearInternalStateIdx, # Only works if positional knowledge is chosen?
             )
         else:
             raise NotImplementedError
@@ -312,7 +320,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
             }
 
             kwargs = _kwargs | policy_params
-
+            logger.info(f"Algorithm being used: {algorithm}")
             if load and model_path.exists():
                 logger.info(f"Loading existing model: '{model_path}'")
                 model = algorithm_obj.load(model_path, **kwargs)

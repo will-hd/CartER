@@ -513,8 +513,9 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         return state
 
     def set_angle_offset(self) -> None:
-        state = self.observe_as_dict()
-        self.angle_offset = state["theta"] - np.pi
+        # state = self.observe_as_dict()
+        # self.angle_offset = state["theta"] - np.pi
+        pass
 
     def absorb_packet(self, packet: CartSpecificPacket) -> None:
         if isinstance(packet, ObservationPacket):
@@ -541,12 +542,14 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
                 self.last_observation_interval = observation_interval / 1e6  # μs -> s
 
                 x = packet.position_steps
-                theta = radians(packet.angle) - self.angle_offset
+                # TODO
+                # theta = radians(packet.angle) - self.angle_offset
+                dx = packet.velocity
 
                 self._state = np.array(
                     (
                         x,
-                        theta,
+                        dx, # was: theta # TODO
                     )
                 )
                 # print(f"recieved actions_done_counter: {packet.actions_done_counter}")
@@ -559,12 +562,13 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         """
         Returns True if the cart is considered settled."""
         xs = [state[self.external_state_idx.X] for state in self.observation_buffer]
-        thetas = [state[self.external_state_idx.THETA] for state in self.observation_buffer]
+        # Remove thetas while not in use
+        # thetas = [state[self.external_state_idx.THETA] for state in self.observation_buffer] # TODO
 
         return all(
             [
-                max(xs) - min(xs) <= self.settled_x_threshold,
-                max(thetas) - min(thetas) <= self.settled_theta_threshold,
+                max(xs) - min(xs) <= self.settled_x_threshold
+                # max(thetas) - min(thetas) <= self.settled_theta_threshold,
             ]
         )
 

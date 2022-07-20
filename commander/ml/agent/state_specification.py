@@ -15,6 +15,7 @@ from commander.ml.agent.constants import (
     ExternalStateIdx,
     ExternalTotalKnowledgeStateIdx,
     InternalStateIdx,
+    ExternalTotalLinearKnowlegeStateIdx
 )
 from commander.ml.agent.type_aliases import GoalParams
 from commander.type_aliases import ExternalState, InternalState
@@ -158,10 +159,54 @@ class AgentPositionalKnowledgeStateSpecMixin(AgentStateSpecBaseMixin):
 
         return cast(ExternalState, external_state)
 
+class AgentTotalLinearKnowledgeStateSpecMixin(AgentStateSpecBaseMixin):
+    """
+    This mixin gives the agent full knowledge of the cart's linear state 
+    (and ignores angular observations). This is intended for use with the BOUNCE
+    goal, where the target is only for the cart to stay central.
+
+    This means the agent will have access to:
+    - Position [X]
+    - Velocity [DX]
+    """
+    def initialise_state_spec(self) -> None:
+        # Calculate size of spaces.
+        # Factors of 2 are to ensure that even failing observations are still within
+        # the observation space.
+        low = np.array(
+            [
+                self.goal_params["failure_position"][0] * 2,  # Position
+                -_FLOAT_MAX,  # Velocity can be any float
+            ],
+            dtype=FLOAT_TYPE,
+        )
+        high = np.array(
+            [
+                self.goal_params["failure_position"][1] * 2,  # Position
+                _FLOAT_MAX,  # Velocity can be any float
+            ],
+            dtype=FLOAT_TYPE,
+        )
+
+        self.observation_space = spaces.Box(low, high, dtype=FLOAT_TYPE)
+
+    external_state_idx = ExternalTotalLinearKnowlegeStateIdx #!!!
+
+    def externalise_state(self, _state: InternalState) -> ExternalState:
+        external_state = np.array(
+            [_state[self.internal_state_idx.X], _state[self.internal_state_idx.DX]]
+        )
+
+        return cast(ExternalState, external_state)
+
 
 def make_state_spec(
     state_spec: Type[AgentStateSpecBaseMixin], internal_state_idx: Type[InternalStateIdx]
 ) -> Type[AgentStateSpecBaseMixin]:
+    '''
+    Takes a state specification mixin and intializes the internal state index: an IntEnum 
+    that will map a label to the appropriate index of the `np.array` of the `_state` attribute.
+    '''
     state_spec.internal_state_idx = internal_state_idx  # type: ignore[assignment]
 
     return state_spec
