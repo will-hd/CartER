@@ -196,6 +196,7 @@ class NetworkManager:
         packets = self.read_packets(block=block, auto_realign=auto_realign)
 
         self.packet_buffer.extend(packets)
+        # print(f"Packet buf length: {len(self.packet_buffer)}")
 
     def printer_callback(
         self, *, pop: bool = True, excepts: Union[Type[Packet], tuple[Type[Packet]]]

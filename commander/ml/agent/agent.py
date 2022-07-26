@@ -402,7 +402,7 @@ class SimulatedCartpoleAgent(CartpoleAgent):
 
         if not self.action_space.contains(action):
                 raise ValueError(f"Action {action} not in action space. Invalid.")
-        logger.debug(action)
+        # logger.debug(action)
         self._state = self._move(action)
 
         if use_force_method:

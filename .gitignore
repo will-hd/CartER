@@ -44,4 +44,4 @@ scripts/
 interesting_logs/ 
 
 # work-space files
-.code-workspace
+*.code-workspace
