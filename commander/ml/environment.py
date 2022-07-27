@@ -393,13 +393,13 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         self.baudrate = baudrate
 
         self.observation_buffer_size = observation_buffer_size
-
+        print(f"Port {self.port}")
         self.network_manager = NetworkManager(port=self.port, baudrate=self.baudrate)
 
+        self.failure_id = None
         # This NetworkManager points to the Native USB Serial port.
         # It only opened and closed, to trigger DTR reset on arduino.
         self.network_reseter = NetworkManager(port="/dev/ttyACM0")
-
         super().__init__(agents=agents)
 
     def _distribute_packet(self, packet: CartSpecificPacket) -> None:
@@ -529,6 +529,7 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         self.network_reseter.open()
         logger.info("Opening and closing Native Serial USB port /dev/ttyACM0 to trigger DTR reset")
         self.network_reseter.close()
+        
         logger.info("Reading inital output")
         initial_output = self.network_manager.read_initial_output(print_=True)
         logger.debug("Initial output: %s", initial_output)
@@ -628,6 +629,10 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=3)
         self.network_manager.send_packet(velo_pkt)
 
+        # Set failure_id to zero (responsible for setting velocity after certain failure modes)
+        logger.info("Setting failure id to False")
+        self.failure_id = False
+
         self.world_time_start = time()
 
         reset_result = super().reset()
@@ -651,7 +656,11 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         logger.debug("Experiment settled")
 
+    def set_end_velocity(self) -> None:
+        ...
+
     def end_experiment(self) -> dict[str, Any]:
+        # add: if reason for ending experiment is max_policy update or max_steps, set velocity to be
         self.environment_state["experiment_state"] = ExperimentState.ENDING
 
         self.total_world_time += self.world_time
@@ -661,6 +670,11 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
             infos[agent.name] = {}
 
         logger.info("Ending experiment")
+        
+        if self.failure_id == True:
+            logger.info("Setting velocity zero")
+            velo_end_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=0)
+            self.network_manager.send_packet(velo_end_pkt)
 
         self.wait_for_settled()
 
@@ -799,6 +813,13 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         self.steps += 1
 
         if any(dones.values()):
+            
+            print(dones)
+            print(infos)
+            if infos['Cartpole_1']['failure_modes'] == ['steps/policy_update']:
+                self.failure_id = True
+                logger.info("Setting failure id to True")
+
             end_experiment_infos = self.end_experiment()
             deepmerge.merge_or_raise.merge(infos, end_experiment_infos)
 

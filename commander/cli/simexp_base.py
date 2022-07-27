@@ -65,8 +65,8 @@ class Algorithm(str, Enum):
 
 ALGORITHM_POLICY_PARAMS_MAP: dict[Algorithm, dict[str, Any]] = {
     Algorithm.PPO: {
-        "n_steps": 256,
-        "batch_size": 32,
+        "n_steps": 4096, # remember to change policy update failure
+        "batch_size": 512,
         "gae_lambda": 0.95,
         "gamma": 0.98,
         "n_epochs": 5,
@@ -131,7 +131,7 @@ def simexp_command(command: SimulationExperimentCommand) -> Command:
     @click.option("--render-with-best/--no-render-with-best", default=True)
     @click.option("--tensorboard/--no-tensorboard", default=True)
     @click.option("--record/--no-record", default=False)
-    @click.option("-t", "--total-timesteps", type=int, default=100000)
+    @click.option("-t", "--total-timesteps", type=int, default=100000*9)
     @click.option(
         "-c",
         "--carts",

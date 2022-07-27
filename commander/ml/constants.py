@@ -15,6 +15,9 @@ class Action(IntEnum):
 class FailureDescriptors(str, Enum):
     MAX_STEPS_REACHED = "steps/max"
 
+    # Try resetting environment when policy update happens, to prevent instability.
+    POLICY_UPDATE_REACHED = "steps/policy_update"
+
     POSITION_LEFT = "position/left"
     POSITION_RIGHT = "position/right"
     ANGLE_LEFT = "angle/left"

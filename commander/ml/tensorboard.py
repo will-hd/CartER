@@ -24,6 +24,7 @@ class GeneralCarterCallback(BaseCallback):
         "position/right": 1,
         "position/left": 2,
         "steps/max": 10,
+        "steps/policy_update": 5,
         "multiple": 0,
         "angle/right": -1,
         "angle/left": -2,

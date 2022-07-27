@@ -62,6 +62,8 @@ class CartpoleAgent(ABC):
         self.pole_length = pole_length
         self.max_steps = max_steps
 
+        self.policy_update_steps: int = 0
+
         self.env: Optional[CartpoleEnv[CartpoleAgentT]] = None
 
         self.info: Mapping[str, Any] = {}
@@ -148,6 +150,11 @@ class CartpoleAgent(ABC):
         """
         checks = self._check_state(state)
         checks[FailureDescriptors.MAX_STEPS_REACHED] = self.steps >= self.max_steps
+        
+        # To prevent potential instability with CPU blocked by update:
+        checks[FailureDescriptors.POLICY_UPDATE_REACHED] = self.policy_update_steps % 4096 == 0
+        # if self.policy_update_steps > 4096: 
+        #     self.policy_update_steps = 0
 
         return checks
 
@@ -259,7 +266,8 @@ class CartpoleAgent(ABC):
         self.post_step(action)
 
         self.steps += 1
-
+        self.policy_update_steps += 1
+        # print(self.steps, self.policy_update_steps)
         return step_info
 
     def _step(self, action: Action) -> StepInfo:
@@ -597,7 +605,7 @@ class ExperimentalCartpoleAgent(CartpoleAgent):
         self.last_action_time = time()
         self.action_freq_ticker.tick()
 
-        value = 30# 50
+        value = 50
 
         value *= 1 if action == Action.FORWARDS else -1
         
