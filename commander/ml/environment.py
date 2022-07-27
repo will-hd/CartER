@@ -251,7 +251,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
                 info["failure_modes"] = failure_modes
 
             info["x"] = observation_dict["x"]
-            info["theta"] = observation_dict["theta"]
+            # info["theta"] = observation_dict["theta"]
             info["agent_name"] = agent.name
             info["environment_episode"] = self.episode
             info["world_time"] = self.world_time
@@ -364,7 +364,7 @@ class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
             agent = self.name_to_agent[agent_name]
             state = agent.observe_as_dict()
 
-            self.poletrans[agent_name].set_rotation(-state["theta"])
+            # self.poletrans[agent_name].set_rotation(-state["theta"])
 
         return self.viewer.render(return_rgb_array=mode == "rgb_array")
 
@@ -671,10 +671,10 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         logger.info("Ending experiment")
         
-        if self.failure_id == True:
-            logger.info("Setting velocity zero")
-            velo_end_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=0)
-            self.network_manager.send_packet(velo_end_pkt)
+        # if self.failure_id == True:
+            # logger.info("Setting velocity to speed up end")
+            # velo_end_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=1000, actobs_tracker=0)
+            # self.network_manager.send_packet(velo_end_pkt)
 
         self.wait_for_settled()
 
