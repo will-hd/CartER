@@ -2,35 +2,24 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from time import time
+from time import sleep, time
 from typing import Any, Generic, Optional, Type, TypedDict, cast
-
+import numpy as np
+import time
 import gym
-import supersuit as ss
 from gym import spaces
-from pettingzoo.utils.env import ParallelEnv
+from torch import pinverse
 
-import deepmerge
-from stable_baselines3.common.vec_env.vec_monitor import VecMonitor
-
+from commander.type_aliases import ExternalState, StepInfo, StepReturn
+from commander.network.network_constants import (ExperimentInfoSpecifier, SetOperation, 
+DEFAULT_BAUDRATE, DEFAULT_PORT, CartID, FailureMode)
+from commander.ml.ml_constants import Action, FailureDescriptors
+from commander.ml.agent.agent import CartpoleAgentT, CartpoleAgent
 from commander.experiment import ExperimentState
-from commander.ml.agent import CartpoleAgent
-from commander.ml.agent.agent import (
-    CartpoleAgentT,
-    ExperimentalCartpoleAgent,
-    SimulatedCartpoleAgent,
-)
-from commander.ml.constants import Action
-from commander.ml.display import rendering
-from commander.network import NetworkManager
-from commander.network.constants import (
-    DEFAULT_BAUDRATE,
-    DEFAULT_PORT,
-    CartID,
-    ExperimentInfoSpecifier,
-    FailureMode,
-    SetOperation,
-)
+
+from commander.utils import FrequencyTicker, raises
+
+from commander.network.network import NetworkManager
 from commander.network.protocol import (
     CartSpecificPacket,
     CheckLimitPacket,
@@ -50,479 +39,351 @@ from commander.network.protocol import (
     SetVelocityPacket,
     SoftLimitReachedPacket,
 )
-from commander.type_aliases import AgentNameT, ExternalState, StepInfo, StepReturn
-from commander.utils import FrequencyTicker, raises
-
+import logging
 logger = logging.getLogger(__name__)
-
 
 class EnvironmentState(TypedDict):
     experiment_state: Optional[ExperimentState]
-    angle_drifts: dict[AgentNameT, float]
-    position_drifts: dict[AgentNameT, int]
-    failure_cart_id: CartID
-    failure_agent: Optional[CartpoleAgent]
-    failure_agent_name: Optional[AgentNameT]
+    position_drifts: int
     failure_mode: FailureMode
     track_length: Optional[int]
-    last_observation_times: dict[AgentNameT, int]
+    last_observation_times: int
     available_memory: Optional[int]
 
-
-class CartpoleEnv(ParallelEnv, Generic[CartpoleAgentT]):  # type: ignore [misc]
+class ExperimentalCartpoleEnv(gym.Env):
     """
-    Base Class for all Cartpole environments.
-    """
+    An environment that represents the Cartpole Environment and
+    implements networking with the physical experiment.
 
-    metadata = {
-        "render.modes": ["human", "rgb_array"],
-        "name": "Cartpole_v0",
-    }
+    | Num | Action                 |
+    |-----|------------------------|
+    | 0   | Push cart to the left  |
+    | 1   | Push cart to the right |
+    
+    Attributes
+    ----------
+    port: (str) port for arduino 
+    baudrate: (int) 
+    network_manager: (NetworkManager) responsible for communication with arduino
+    network_reseter: (NetworkManager) used only for opening and closing to force DTR reset
+
+    _agent: (CartpoleAgentT) Agent in the environment
+    action_space: (gym.space) Discrete(2) agent can choose back and forth
+    observation_space: (gym.space) for gym API
+    environment_state: (dict) Describes the environment state 
+
+    episode: (int) No. episodes (+1 each reset called)
+    world_time_start: (float?) Real time when experiment was started
+    world_time: (float) Real timer
+    observation_freq_ticker: (FrequencyTicker()) Object to measure the frequency of actions
+
+    steps: (int) Counts number of steps of episode, set to zero each reset.
+    
+
+    -------
+    Methods
+    -------
+    step() - Required for gym API
+        Performs step in environment, given an action.
+    reset() - Required for gym API
+        Resets the environment to an initial state and returns the initial observation.
+    setup()
+        Called when environment first initialised
+    _do_rig_reset()
+        Performs hardware specific resets.
+    _reset_environment_state()
+    _do_rig_setup()
+        Performs hardware specific setup
+    init_gym_spaces()
+        Initialises gym observation and action spaces
+    get_agent() - probably not needed rn
+        Getter method
+    is_settled()
+        Returns True if agent considers itself settled
+    wait_for_settled()
+        Calls a network tick until system is settled.
+    network_tick()
+        Ticks network by calling to digest and _process_buffer
+    _distribute_packets()
+        Passes packet onto agent to absorb
+    _process_buffer
+        Processes packets in the internal buffer of network manager.
+    end_experiment()
+        If failed, ends the (hardware) experiment.
+    _has_failed
+        Returns if the experiment hase failed: the environment_state is not nul.
+    """
 
     def __init__(
         self,
-        agents: Sequence[CartpoleAgentT],
-        defer_reset: bool = True,
-    ):
-        self.agents = [agent.name for agent in agents]
-        self.possible_agents = self.agents[:]
-        self._agents = list(agents)
+        port: str = DEFAULT_PORT,
+        baudrate: int = DEFAULT_BAUDRATE,
+    ) -> None:
+        self.port = port
+        self.baudrate = baudrate
 
-        self.name_to_agent: Mapping[AgentNameT, CartpoleAgentT] = dict(
-            zip(self.possible_agents, self._agents)
-        )
-
-        self.action_spaces: Mapping[str, spaces.Space] = {
-            agent.name: agent.action_space for agent in self.get_agents()
-        }
-        self.observation_spaces: Mapping[str, spaces.Space] = {
-            agent.name: agent.observation_space for agent in self.get_agents()
-        }
-
-        self.seed()
-
+        self.network_manager = NetworkManager(port=self.port, baudrate=self.baudrate)
+        # This NetworkManager points to the Native USB Serial port.
+        # It is only opened and closed, to trigger DTR reset on arduino when an 
+        # experiment is started.
+        self.network_reseter = NetworkManager(port="/dev/ttyACM0")
+        
+        self._agent = CartpoleAgent()
+        self.failure_id = False
         self.setup()
 
-        # Note some key attributes are only set after calling reset!
-        if not defer_reset:
-            self.reset()
+       
+    def step(self, action: Action) -> StepReturn:
+        """
+        Performs step in environment, given an action.
+        Gym cartpole env:
+        - Takes state from previous step
+        - Performs action
+        - Gets new state
+        - Done?
+        Exp cartpole env:
+        - Agent performs step
+        - Check if failed
+        - Wait for a new observation
 
-    def seed(self, seed: Optional[int] = None) -> list[Any]:
-        seeds = [agent.seed() for agent in self.get_agents()]
+        Returns:
+            state (np.float32)
+            reward
+            done (bool)
+            info (dict)
+        """
+        self.observation_freq_ticker.tick()
+        self.observation_freq_ticker.tick()
 
-        return seeds
+        info = {}
+        dones = {}
+        # logger.debug(action) 
+        info["agent_stepinfo"] = self._agent.step(action)
+        self.network_tick()
 
-    def setup(self) -> None:
+        # TODO 3/5
+        # Check if we have failed - why here??! Checks for hw failure (e.g. soft limit)
+        if self._has_failed():
+            print("In _has_failed if statement")
+            info["Fail"] = {
+                "failure_modes": [self.environment_state["failure_mode"].describe()]
+            }
+            dones["softlimit_done"] = True
+
+        # Wait for new observation
+        while True and not self._has_failed():
+            
+            all_observations_are_new = all(
+                [
+                    self.environment_state["last_observation_time"]
+                    != self._agent.last_observation_time
+                ]
+            )
+
+            if all_observations_are_new:
+                break
+
+            self.network_tick()
+
+               
+        # Take observation of experiment state
+        observation = self._agent.observe()
+        # print(observation)
+        # observation_dict = self._agent.observe_as_dict()
+        # logger.debug(f"obs1: {observsation}")
+        self.environment_state["last_observation_time"] = self._agent.last_observation_time
+
+        # Populate step information for debugging and callbacks
+        step_info: StepInfo = {}
+        # step_info["x"] = observation_dict["x"]
+        # step_info["dx"] = observation_dict["dx"]
+        step_info["environment_episode"] = self.episode
+        step_info["available_memory"] = self.environment_state["available_memory"]
+
+        world_time = 1#time() - self.world_time_start
+        step_info["world_time"] = world_time
+        step_info["observation_frequency"] = self.observation_freq_ticker.measure()
+        step_info["serial_in_waiting"] = self.network_manager.serial.in_waiting
+
+        # Add step_info to info
+        info["step_info"] = step_info # Previously was |= pipe-equals
+
+        checks = self._agent.check_state(observation)
+
+        if checks[FailureDescriptors.MAX_STEPS_REACHED]:
+            # to speed up end
+            self.failure_id = True
+
+        done = any(checks.values()) or any(dones.values())
+
+        reward = self._agent.reward(observation) if not done else 0.0
+        # logger.debug(f"obs2: {observation}, rew: {reward}")
+        self.steps += 1
+
+        if done:
+            failure_modes = [k.value for k, v in checks.items() if v]
+            logger.info(f"Failure modes: {failure_modes}")
+
+            info["failure_modes"] = failure_modes
+            print(info)
+
+            end_experiment_info = self.end_experiment()
+            # deepmerge.merge_or_raise.merge(info, end_experiment_info)
+
+            # TODO
+            logger.debug("Environment state: %s", self.environment_state)
+
+        return observation, reward, done, info
+
+    def reset(self):
+        """
+        Resets the environment to an initial state and returns the initial observation.
+        Returns:
+            state 
+                observation of initial state
+            info (optional dict)
+                contains auxiliary information complementing the observation
+
+        """
+        # Agent _pre_reset
+        self._agent._pre_reset()
+        
+
+        self._do_rig_reset()
+        self.episode += 1
+
+        observation = self._agent.reset()
+        # ## Environment-level resets
+        self.steps: int = 0
+        self.world_time: float = 0.0
+        self.observation_freq_ticker.clear()
+
+        self.failure_id = False
+        return observation
+
+    def setup(self):
         """
         Called when environment first initialised.
 
         Not called after each reset.
         """
-        for agent in self.get_agents():
-            agent.set_environment(self)
-
-        self.episode: int = 0
-        self.total_world_time: float = 0.0
-
-        self.observation_freq_ticker = FrequencyTicker()
-
-    def reset(self) -> Mapping[str, ExternalState]:
-        self.episode += 1
-        observations = {}
-
-        # This needs to be agent names/ids
-        self.agents = self.possible_agents[:]
-
-        for agent in self.get_agents():
-            observations[agent.name] = agent.reset()
-
-        # ## Environment-level resets
-        self.steps: int = 0
-        self.viewer: Optional[rendering.Viewer] = None
-        self.world_time: float = 0.0
-
-        self.observation_freq_ticker.clear()
-
-        # Return observations from agent reset
-        return observations
-
-    def observe(self, agent: str) -> ExternalState:
-        return self.name_to_agent[agent].observe()
-
-    def close(self) -> None:
-        raise NotImplementedError("This should be overridden")
-
-    def step(self, actions: dict[AgentNameT, Action]) -> StepReturn:
-        """
-        Performs a step using a dict of actions matching the current agents.
-        """
-        self.observation_freq_ticker.tick()
-
-        result = self._step(actions=actions)
-        return result
-
-    def _step(self, actions: dict[AgentNameT, Action]) -> StepReturn:
-        """
-        Performs a step using a dict of actions matching the current agents.
-        """
-        raise NotImplementedError("This should be overriden")
-
-    def get_agents(self, all_: bool = False) -> list[CartpoleAgentT]:
-        """
-        Returns a list of the current agents as agent objects.
-
-        Use the `agents` attribute to get agent names.
-        """
-        agent_names = self.possible_agents if all_ else self.agents
-        agents = [self.name_to_agent[name] for name in agent_names]
-
-        return agents
-
-
-EnvT = CartpoleEnv[CartpoleAgent]
-
-
-class SimulatedCartpoleEnv(CartpoleEnv[SimulatedCartpoleAgent]):
-    """
-    An environment that represents the Cartpole Environment and
-    implements simulated physics.
-    """
-
-    def __init__(
-        self,
-        agents: Sequence[SimulatedCartpoleAgent],
-        start_time: float = 0.0,  # s
-        timestep: float = 0.02,  # s
-        world_size: tuple[float, float] = (-2.5, 2.5),
-    ) -> None:
-        self.start_time = start_time
-        self.timestep = timestep
-        self.world_size = world_size
-
-        super().__init__(agents=agents)
-
-    def setup(self) -> None:
-        super().setup()
-
-        for agent in self.get_agents():
-            assert isinstance(agent, SimulatedCartpoleAgent)
-
-            agent.tau = self.timestep
-
-    def _step(self, actions: dict[AgentNameT, Action]) -> StepReturn:
-        """
-        Performs a single step in the environment using the currently selector agent
-        to perform the given action.
-
-        The state information available to our agent is the position of the
-        cart and the angle of the pole as well as their first derivatives.
-
-        Using the approach described in Florian's paper
-        https://coneural.org/florian/papers/05_cart_pole.pdf
-
-        We are able to obtain the second derivatives of position and angle as
-        well.
-
-        These can then be numerically integrated to update the environment
-        based on the action.
-        """
-
-        observations = {}
-        rewards = {}
-        dones = {}
-        infos = {}
-
-        for agent_name, action in actions.items():
-            agent = self.name_to_agent[agent_name]
-
-            info = agent.step(action)
-            observation = agent.observe()
-            observation_dict = agent.observe_as_dict()
-
-            checks = agent.check_state(observation)
-            done = any(checks.values())
-
-            reward = agent.reward(observation) if not done else 0.0
-
-            if done:
-                failure_modes = [k.value for k, v in checks.items() if v]
-                logger.info(f"Failure modes: {failure_modes}")
-
-                info["failure_modes"] = failure_modes
-
-            info["x"] = observation_dict["x"]
-            info["theta"] = observation_dict["theta"]
-            info["agent_name"] = agent.name
-            info["environment_episode"] = self.episode
-            info["world_time"] = self.world_time
-            info["total_world_time"] = self.total_world_time
-            info["observation_frequency"] = self.observation_freq_ticker.measure()
-
-            observations[agent_name] = observation
-            rewards[agent_name] = reward
-            dones[agent_name] = done
-            infos[agent_name] = info
-
-        # Patch dones such that when any agent is done, all agents are done
-        if any(dones.values()):
-            dones = {agent_name: True for agent_name in actions.keys()}
-
-        self.world_time += self.timestep
-        self.total_world_time += self.timestep
-        self.steps += 1
-
-        return observations, rewards, dones, infos
-
-    def render(self, mode: str = "human") -> rendering.Viewer:
-        if rendering is None:
-            raise SystemError("Display not available. Cannot render.")
-
-        screen_width = 600
-        screen_height = 400
-
-        world_width = abs(self.world_size[0] - self.world_size[1])
-        scale = screen_width / world_width
-
-        carty = 100  # TOP OF CART
-        cartwidth = scale * 1.0
-        cartheight = scale * 0.6
-
-        polewidth = scale * 0.2
-
-        axleoffset = cartheight / 4.0
-
-        if self.viewer is None:
-
-            self.viewer = rendering.Viewer(screen_width, screen_height)
-
-            self.carts = {}
-            self.carttrans = {}
-            self.poles = {}
-            self.poletrans = {}
-            self.polelens = {}
-            self.axles = {}
-            for agent in self.get_agents():
-                # Cart
-                l, r, t, b = -cartwidth / 2, cartwidth / 2, cartheight / 2, -cartheight / 2
-                cart = rendering.FilledPolygon([(l, b), (l, t), (r, t), (r, b)])
-                carttrans = rendering.Transform()
-
-                # Pole
-                polelen = scale * (2 * agent.pole_length)
-                l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
-                pole = rendering.FilledPolygon([(l, b), (l, t), (r, t), (r, b)])
-                poletrans = rendering.Transform(translation=(0, axleoffset))
-
-                # Axle
-                axle = rendering.make_circle(polewidth / 2)
-
-                # Transformations
-                cart.add_attr(carttrans)
-
-                pole.add_attr(poletrans)
-                pole.add_attr(carttrans)
-
-                axle.add_attr(poletrans)
-                axle.add_attr(carttrans)
-
-                # Appearance
-                pole.set_color(0.8, 0.6, 0.4)
-                axle.set_color(0.5, 0.5, 0.8)
-
-                # Add geometry
-                self.viewer.add_geom(cart)
-                self.viewer.add_geom(pole)
-                self.viewer.add_geom(axle)
-
-                self.carts[agent.name] = cart
-                self.carttrans[agent.name] = carttrans
-                self.poles[agent.name] = pole
-                self.poletrans[agent.name] = poletrans
-                self.polelens[agent.name] = polelen
-                self.axles[agent.name] = axle
-
-            track = rendering.Line((0, carty), (screen_width, carty))
-            track.set_color(0, 0, 0)
-
-            self.viewer.add_geom(track)
-
-        if self.state is None:
-            return None
-
-        for pole, polelen in zip(self.poles.values(), self.polelens.values()):
-            l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
-            pole.v = [(l, b), (l, t), (r, t), (r, b)]
-
-        for agent_name, cart in self.carts.items():
-            agent = self.name_to_agent[agent_name]
-            state = agent.observe_as_dict()
-
-            cartx = state["x"] * scale + screen_width / 2.0  # MIDDLE OF CART
-            self.carttrans[agent_name].set_translation(cartx, carty)
-
-        for agent_name, pole in self.poles.items():
-            agent = self.name_to_agent[agent_name]
-            state = agent.observe_as_dict()
-
-            self.poletrans[agent_name].set_rotation(-state["theta"])
-
-        return self.viewer.render(return_rgb_array=mode == "rgb_array")
-
-    def close(self) -> None:
-        if self.viewer:
-            self.viewer.close()
-            self.viewer = None
-
-
-class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
-    """
-    An environment that represents the Cartpole Environment and
-    implements networking with the physical experiment.
-    """
-
-    name_to_agent: Mapping[AgentNameT, ExperimentalCartpoleAgent]
-
-    def __init__(
-        self,
-        agents: Sequence[ExperimentalCartpoleAgent],
-        port: str = DEFAULT_PORT,
-        baudrate: int = DEFAULT_BAUDRATE,
-        observation_buffer_size: int = 100,
-    ) -> None:
-        self.port = port
-        self.baudrate = baudrate
-
-        self.observation_buffer_size = observation_buffer_size
-        print(f"Port {self.port}")
-        self.network_manager = NetworkManager(port=self.port, baudrate=self.baudrate)
-
-        self.failure_id = None
-        # This NetworkManager points to the Native USB Serial port.
-        # It only opened and closed, to trigger DTR reset on arduino.
-        self.network_reseter = NetworkManager(port="/dev/ttyACM0")
-        super().__init__(agents=agents)
-
-    def _distribute_packet(self, packet: CartSpecificPacket) -> None:
-        agent = self.cart_id_to_agent[packet.cart_id]
-
-        agent.absorb_packet(packet)
-
-    def _distribute_packets(self, packets: Sequence[CartSpecificPacket]) -> None:
-        for packet in packets:
-            self._distribute_packet(packet)
-
-    def _process_buffer(self) -> None:
-        """
-        Call often to process packets in buffer of network manager.
-        """
-
-        # NullPackets
-        self.network_manager.get_packets(NullPacket, digest=False)
-
-        # ObservationPackets
-        obs_pkts = self.network_manager.get_packets(ObservationPacket, digest=False)
-        self._distribute_packets(obs_pkts)
-
-        # DebugPackets
-        dbg_pkts = self.network_manager.get_packets(DebugPacket, digest=False)
-        for dbg_pkt in dbg_pkts:
-            logger.debug("CONTROLLER| %s", dbg_pkt.msg)
-
-        # InfoPackets
-        info_pkts = self.network_manager.get_packets(InfoPacket, digest=False)
-        for info_pkt in info_pkts:
-            logger.info("CONTROLLER| %s", info_pkt.msg)
-
-        # ErrorPackets
-        err_pkts = self.network_manager.get_packets(ErrorPacket, digest=False)
-        for err_pkt in err_pkts:
-            logger.error("CONTROLLER| %s", err_pkt.msg)
-
-        # ExperimentInfoPackets
-        exp_info_pkts = self.network_manager.get_packets(ExperimentInfoPacket, digest=False)
-        for exp_info_pkt in exp_info_pkts:
-            agent: Optional[ExperimentalCartpoleAgent]
-            try:
-                agent = self.cart_id_to_agent[exp_info_pkt.cart_id]
-            except KeyError:
-                agent = None
-
-            if exp_info_pkt.specifier == ExperimentInfoSpecifier.POSITION_DRIFT:
-                assert agent is not None
-
-                self.environment_state["position_drifts"][agent.name] = cast(
-                    int, exp_info_pkt.value
-                )
-
-            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.FAILURE_MODE:
-                assert agent is not None
-
-                self.environment_state["failure_cart_id"] = exp_info_pkt.cart_id
-                self.environment_state["failure_agent"] = agent
-                self.environment_state["failure_agent_name"] = agent.name
-                self.environment_state["failure_mode"] = cast(FailureMode, exp_info_pkt.value)
-
-            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.TRACK_LENGTH_STEPS:
-                self.environment_state["track_length"] = cast(int, exp_info_pkt.value)
-
-                for agent in self.get_agents():
-                    agent.update_goal(
-                        {"track_length": cast(int, self.environment_state["track_length"])}
-                    )
-
-            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.AVAILABLE_MEMORY:
-                self.environment_state["available_memory"] = cast(int, exp_info_pkt.value)
-
-            else:
-                raise ValueError(
-                    "Environment does not know how to deal with specifier: "
-                    + exp_info_pkt.specifier.name
-                )
-
-            # SoftLimitReachedPackets
-            # Just ignore since we currently use ExperimentInfoPackets to determine done state
-            self.network_manager.get_packets(SoftLimitReachedPacket, digest=False)
-
-        if len(self.network_manager.packet_buffer) >= 3:
-            logger.error(
-                "Had packets in buffer after processing: %s", self.network_manager.packet_buffer
-            )
-
-    def _reset_environment_state(self) -> None:
-        self.environment_state: EnvironmentState = {
-            "experiment_state": None,
-            "angle_drifts": {},
-            "position_drifts": {},
-            "failure_cart_id": CartID.NUL,
-            "failure_agent": None,
-            "failure_agent_name": None,
-            "failure_mode": FailureMode.NUL,
-            "track_length": None,
-            "last_observation_times": {},
-            "available_memory": None,
-        }
-
-        for agent in self.get_agents():
-            self.environment_state["last_observation_times"][agent.name] = 0
-
-    def setup(self) -> None:
         logger.info("Running experimental environment setup")
 
+        self.init_gym_spaces()
         self._reset_environment_state()
         self.environment_state["experiment_state"] = ExperimentState.STARTING
 
-        super().setup()
+        # Agent setups
+        self._agent.set_environment(self)
+        self._agent.setup_by_environment(
+                network_manager=self.network_manager)
 
-        self.cart_id_to_agent: dict[CartID, ExperimentalCartpoleAgent] = {}
+        self.episode: int = 0
 
-        for agent in self.get_agents(all_=True):
-            agent.setup_by_environment(
-                network_manager=self.network_manager,
-                observation_buffer_size=self.observation_buffer_size,
+        self.observation_freq_ticker = FrequencyTicker()
+        self._do_rig_setup()
+        
+    def init_gym_spaces(self) -> None:
+        # Calculate size of spaces.
+        # Factors of 2 are to ensure that even failing observations are still within
+        # the observation space.
+        low = np.array(
+            [
+                -1000, #self.goal_params["failure_position"][0] * 2,  # Position
+                -np.finfo(np.float64).max,  # Velocity can be any float
+            ],
+            dtype=np.float64,
+        )
+        high = np.array(
+            [
+                +27000, #self.goal_params["failure_position"][1] * 2,  # Position
+                np.finfo(np.float64).max,  # Velocity can be any float
+            ],
+            dtype=np.float64,
+        )
+
+         # Can only apply two actions, back or forth
+        self.action_space = spaces.Discrete(2)
+        self.observation_space = spaces.Box(low, high, dtype=np.float64)
+
+    def _do_rig_reset(self) -> None:
+        """
+        Runs reset process of hardware environment. Should be called during 
+        gym env reset().
+        - Sets max velocity
+        - Set velocity
+        - Ask controller to start experiment
+        - Set zero angles
+        - Set
+        """
+
+        logger.info("Resetting experimental environment")
+        self.environment_state["experiment_state"] = ExperimentState.RESETTING
+        self._reset_environment_state()
+
+        
+        self.network_manager.assert_ping_pong()
+
+        # Set max velocity
+        logger.info("Setting max velocity")
+        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=10_000, actobs_tracker=2)
+        self.network_manager.send_packet(max_velo_pkt)
+
+        # Set velocity
+        logger.info("Setting velocity")
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=1)
+        self.network_manager.send_packet(velo_pkt)
+
+        # Ask controller to start experiment
+        logger.info("Starting experiment")
+        experiment_start_pkt = ExperimentStartPacket(0)
+        self.network_manager.send_packet(experiment_start_pkt)
+        self.network_manager.get_packet(
+            ExperimentStartPacket, digest=True, block=True, callback=self._process_buffer
+        )
+        
+        while raises(self._agent.observe, IOError):
+            
+            obs_pkts = self.network_manager.get_packets(
+                ObservationPacket, digest=True, callback=self._process_buffer
             )
+            self._distribute_packets(obs_pkts)
 
-            self.cart_id_to_agent[agent.cart_id] = agent
+        self.wait_for_settled()
 
+        # Jiggle - not implemented, change to wait/sleep timeout # TODO 3/5
+        logger.info("Jiggling carts to zero angle")
+        jiggle_pkt = DoJigglePacket()
+        self.network_manager.send_packet(jiggle_pkt)
+        self.network_manager.get_packet(
+            DoJigglePacket, digest=True, block=True, callback=self._process_buffer
+        )
+
+        self.wait_for_settled()
+
+        # Set velocity
+        logger.info("Setting velocity")
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=3)
+        self.network_manager.send_packet(velo_pkt)
+
+        self.world_time_start = 1#time()
+
+        self.environment_state["experiment_state"] = ExperimentState.RUNNING
+    
+    def _reset_environment_state(self) -> None:
+        self.environment_state: EnvironmentState = {
+            "experiment_state": None,
+            "position_drift": None,
+            "failure_mode": FailureMode.NUL,
+            "track_length": None,
+            "last_observation_time": None,
+            "available_memory": None,
+        }
+
+        self.environment_state["last_observation_time"] = 0
+
+    def _do_rig_setup(self) -> None:
+        # Setup network managers
         logger.info("Opening serial connection to controller")
         self.network_manager.open()
         # DTR arduino reset
@@ -533,8 +394,6 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         logger.info("Reading inital output")
         initial_output = self.network_manager.read_initial_output(print_=True)
         logger.debug("Initial output: %s", initial_output)
-
-        # assert not self.network_manager.in_queue
 
         # Check connection
         self.network_manager.assert_ping_pong()
@@ -566,89 +425,22 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
             RequestDebugInfoPacket, digest=True, block=True, callback=self._process_buffer
         )
 
-        self.total_world_time: float = 0.0
+        logger.info("Experimental environment setup done")    
 
-        logger.info("Experimental environment setup done")
-
-    def reset(self) -> Mapping[str, ExternalState]:
-        logger.info("Resetting experimental environment")
-
-        self.environment_state["experiment_state"] = ExperimentState.RESETTING
-
-        self._reset_environment_state()
-
-        self.agents = self.possible_agents[:]
-        for agent in self.get_agents():
-            agent._pre_reset()
-
-        self.network_manager.assert_ping_pong()
-
-        # Set max velocity
-        logger.info("Setting max velocity")
-        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=10_000, actobs_tracker=2)
-        self.network_manager.send_packet(max_velo_pkt)
-
-        # Set velocity
-        logger.info("Setting velocity")
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=1)
-        self.network_manager.send_packet(velo_pkt)
-
-        # Ask controller to start experiment
-        logger.info("Starting experiment")
-        experiment_start_pkt = ExperimentStartPacket(0)
-        self.network_manager.send_packet(experiment_start_pkt)
-        self.network_manager.get_packet(
-            ExperimentStartPacket, digest=True, block=True, callback=self._process_buffer
-        )
-
-        while any([raises(agent.observe, IOError) for agent in self.get_agents()]):
-            obs_pkts = self.network_manager.get_packets(
-                ObservationPacket, digest=True, callback=self._process_buffer
-            )
-            self._distribute_packets(obs_pkts)
-
-        self.wait_for_settled()
-
-        # Jiggle
-        logger.info("Jiggling carts to zero angle")
-        jiggle_pkt = DoJigglePacket()
-        self.network_manager.send_packet(jiggle_pkt)
-        self.network_manager.get_packet(
-            DoJigglePacket, digest=True, block=True, callback=self._process_buffer
-        )
-
-        self.wait_for_settled()
-
-        # Set zero angles
-        logger.info("Zeroing angles")
-        for agent in self.get_agents():
-            agent.set_angle_offset()
-
-        # Set velocity
-        logger.info("Setting velocity")
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=3)
-        self.network_manager.send_packet(velo_pkt)
-
-        # Set failure_id to zero (responsible for setting velocity after certain failure modes)
-        logger.info("Setting failure id to False")
-        self.failure_id = False
-
-        self.world_time_start = time()
-
-        reset_result = super().reset()
-
-        self.environment_state["experiment_state"] = ExperimentState.RUNNING
-
-        return reset_result
-
-    def network_tick(self) -> None:
-        self.network_manager.digest()
-        self._process_buffer()
-
+    def get_agent(self) -> CartpoleAgentT:
+        """
+        Returns cartpole agent
+        """
+        return self._agent
+    
     def is_settled(self) -> bool:
-        return all([agent.is_settled() for agent in self.get_agents()])
-
+        """Returns True if agent considers itself settled"""
+        return self._agent.is_settled()
+    
     def wait_for_settled(self) -> None:
+        """
+        Calls a network tick until system is settled.
+        """
         logger.debug("Waiting for system to settle")
 
         while not self.is_settled():
@@ -656,40 +448,101 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
 
         logger.debug("Experiment settled")
 
-    def set_end_velocity(self) -> None:
-        ...
+    def network_tick(self) -> None:
+        """Ticks network by calling to digest and _process_buffer"""
+        self.network_manager.digest()
+        self._process_buffer()
+      
+    def _distribute_packets(self, packets: Sequence[CartSpecificPacket]) -> None:
+        """Passes packet to agent to absorb."""
+        for packet in packets:
+            self._agent.absorb_packet(packet)
+
+    def _process_buffer(self) -> None:
+        """
+        Processes packets in the internal buffer of network manager. Call often
+        (currently each step and as callback).
+        """
+        # NullPackets
+        self.network_manager.get_packets(NullPacket, digest=False)
+
+        # ObservationPackets
+        obs_pkts = self.network_manager.get_packets(ObservationPacket, digest=False)
+        self._distribute_packets(obs_pkts)
+
+        # DebugPackets
+        dbg_pkts = self.network_manager.get_packets(DebugPacket, digest=False)
+        for dbg_pkt in dbg_pkts:
+            logger.debug("CONTROLLER| %s", dbg_pkt.msg)
+
+        # InfoPackets
+        info_pkts = self.network_manager.get_packets(InfoPacket, digest=False)
+        for info_pkt in info_pkts:
+            logger.info("CONTROLLER| %s", info_pkt.msg)
+
+        # ErrorPackets
+        err_pkts = self.network_manager.get_packets(ErrorPacket, digest=False)
+        for err_pkt in err_pkts:
+            logger.error("CONTROLLER| %s", err_pkt.msg)
+
+        # ExperimentInfoPackets
+        exp_info_pkts = self.network_manager.get_packets(ExperimentInfoPacket, digest=False)
+        for exp_info_pkt in exp_info_pkts:
+            if exp_info_pkt.specifier == ExperimentInfoSpecifier.POSITION_DRIFT:
+
+                self.environment_state["position_drift"] = cast(
+                    int, exp_info_pkt.value
+                )
+
+            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.FAILURE_MODE:
+                sleep(1)
+                self.environment_state["failure_mode"] = cast(FailureMode, exp_info_pkt.value)
+
+            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.TRACK_LENGTH_STEPS:
+            # Update track_length for reward calculations
+                self.environment_state["track_length"] = cast(int, exp_info_pkt.value)
+
+                self._agent.update_goal(
+                    {"track_length": cast(int, self.environment_state["track_length"])}
+                )
+
+            elif exp_info_pkt.specifier == ExperimentInfoSpecifier.AVAILABLE_MEMORY:
+                self.environment_state["available_memory"] = cast(int, exp_info_pkt.value)
+
+            else:
+                raise ValueError(
+                    "Environment does not know how to deal with specifier: "
+                    + exp_info_pkt.specifier.name
+                )
+
+            # SoftLimitReachedPackets
+            # Just ignore since we currently use ExperimentInfoPackets to determine done state
+            self.network_manager.get_packets(SoftLimitReachedPacket, digest=False)
+
+        if len(self.network_manager.packet_buffer) >= 3:
+            logger.error(
+                "Had packets in buffer after processing: %s", self.network_manager.packet_buffer
+            )
+    
 
     def end_experiment(self) -> dict[str, Any]:
+        """
+        If failed, end the (hardware) experiment.
+
+        """
         # add: if reason for ending experiment is max_policy update or max_steps, set velocity to be
         self.environment_state["experiment_state"] = ExperimentState.ENDING
 
-        self.total_world_time += self.world_time
-
-        infos: dict[str, Any] = {}
-        for agent in self.get_agents():
-            infos[agent.name] = {}
-
+        info: dict[str, Any] = {}
+        
         logger.info("Ending experiment")
         
-        if self.failure_id == True:
-            logger.info("Setting velocity zero")
+        if self.failure_id:
+            logger.info("Setting velocity to speed up end")
             velo_end_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=0)
             self.network_manager.send_packet(velo_end_pkt)
 
         self.wait_for_settled()
-
-        logger.info("Jiggling carts to find angle wander")
-        jiggle_pkt = DoJigglePacket()
-        self.network_manager.send_packet(jiggle_pkt)
-        self.network_manager.get_packet(
-            DoJigglePacket, digest=True, block=True, callback=self._process_buffer
-        )
-
-        self.wait_for_settled()
-
-        # Gets angle wander for each cart
-        for agent in self.get_agents():
-            self.environment_state["angle_drifts"][agent.name] = agent.get_angle_drift()
 
         # Check limits
         logger.info("Checking limits")
@@ -717,146 +570,17 @@ class ExperimentalCartpoleEnv(CartpoleEnv[ExperimentalCartpoleAgent]):
         # Process final packets
         self.network_tick()
 
-        for agent_name, angle_drift in self.environment_state["angle_drifts"].items():
-            infos[agent_name]["angle_drift"] = angle_drift
-
-        for agent_name, position_drift in self.environment_state["position_drifts"].items():
-            infos[agent_name]["position_drift"] = position_drift
-
-        infos["failure_cart_id"] = self.environment_state["failure_cart_id"]
+        info["position_drift"] = self.environment_state["position_drift"]
+        info = self.environment_state
 
         self.environment_state["experiment_state"] = ExperimentState.ENDED
 
-        return infos
+        return info
 
     def _has_failed(self) -> bool:
+        """Returns if the experiment hase failed: the environment_state is not nul."""
         return self.environment_state["failure_mode"] is not FailureMode.NUL
 
-    def _step(self, actions: dict[AgentNameT, Action]) -> StepReturn:
-        # ! For now assume single cart. Change later
-        # Very ugly temporary code - I'd like it to work today
+    
 
-        observations = {}
-        rewards = {}
-        dones = {}
-        infos = {}
-
-        for agent_name, action in actions.items():
-            agent = self.name_to_agent[agent_name]
-
-            infos[agent_name] = agent.step(action)
-
-        self.network_tick()
-
-        # Check if we have failed
-        if self._has_failed():
-            assert self.environment_state["failure_agent_name"] is not None
-
-            infos[self.environment_state["failure_agent_name"]] = {
-                "failure_modes": [self.environment_state["failure_mode"].describe()]
-            }
-            dones[self.environment_state["failure_agent_name"]] = True
-
-        while True and not self._has_failed():
-            # print("still in this loop")
-            all_observations_are_new = all(
-                [
-                    self.environment_state["last_observation_times"][agent.name]
-                    != agent.last_observation_time
-                    for agent in self.get_agents()
-                ]
-            )
-
-            if all_observations_are_new:
-                break
-
-            self.network_tick()
-
-        for agent in self.get_agents():
-            info: StepInfo = {}
-
-            observation = agent.observe()
-            observation_dict = agent.observe_as_dict()
-
-            self.environment_state["last_observation_times"][
-                agent.name
-            ] = agent.last_observation_time
-
-            info["x"] = observation_dict["x"]
-            info["theta"] = observation_dict["theta"]
-            info["agent_name"] = agent.name
-            info["environment_episode"] = self.episode
-            info["available_memory"] = self.environment_state["available_memory"]
-
-            checks = agent.check_state(observation)
-            done = any(checks.values())
-
-            reward = agent.reward(observation) if not done else 0.0
-
-            world_time = time() - self.world_time_start
-            info["world_time"] = world_time
-            info["total_world_time"] = self.total_world_time
-            info["observation_frequency"] = self.observation_freq_ticker.measure()
-            info["serial_in_waiting"] = self.network_manager.serial.in_waiting
-
-            if done:
-                failure_modes = [k.value for k, v in checks.items() if v]
-                logger.info(f"Failure modes: {failure_modes}")
-
-                info["failure_modes"] = failure_modes
-
-            observations[agent_name] = observation
-            rewards[agent_name] = reward
-            dones[agent_name] = done or bool(dones.get(agent_name))
-            infos[agent_name] |= info
-
-        self.steps += 1
-
-        if any(dones.values()):
-            
-            print(dones)
-            print(infos)
-            if infos['Cartpole_1']['failure_modes'] == ['steps/policy_update']:
-                self.failure_id = True
-                logger.info("Setting failure id to True")
-
-            end_experiment_infos = self.end_experiment()
-            deepmerge.merge_or_raise.merge(infos, end_experiment_infos)
-
-            # TODO
-            logger.debug("Environment state: %s", self.environment_state)
-
-        return observations, rewards, dones, infos
-
-
-def make_env(base_env: Type[EnvT], *args: Any, num_frame_stacking: int = 1, **kwargs: Any) -> EnvT:
-    env = base_env(*args, **kwargs)
-
-    env = ss.frame_stack_v1(env, stack_size=num_frame_stacking)
-    env = ss.black_death_v2(env)
-
-    return env
-
-
-def make_sb3_env(
-    base_env: Type[EnvT], *args: Any, num_frame_stacking: int = 1, **kwargs: Any
-) -> gym.vector.VectorEnv:
-    """
-    Wrappers all the way down...
-    """
-    env = make_env(base_env, *args, num_frame_stacking=num_frame_stacking, **kwargs)
-
-    env = ss.pettingzoo_env_to_vec_env_v0(env)
-
-    # Note: VecMonitor automatically vectorises it for us, I believe.
-    # It doesn't seem to behave nicely without this - probably need another wrapper
-    # like concat vec with just one env and 0 cpus
-    venv = VecMonitor(env)
-
-    return venv
-
-
-def get_sb3_env_root_env(env: VecMonitor) -> EnvT:
-    root_env = cast(Any, env).unwrapped.par_env.unwrapped.env
-
-    return cast(EnvT, root_env)
+        

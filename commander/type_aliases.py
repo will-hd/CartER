@@ -4,23 +4,19 @@ Contains related type aliases.
 from __future__ import annotations
 
 from typing import Any
+import numpy as np
 
 import numpy.typing as npt
+from commander.ml.ml_constants import FailureDescriptors
 
-from commander.constants import FLOAT_TYPE
-from commander.ml.constants import FailureDescriptors
-
-AgentNameT = str
-
-InternalState = npt.NDArray[FLOAT_TYPE]
-ExternalState = npt.NDArray[FLOAT_TYPE]
+ExternalState = npt.NDArray[np.float64]
 
 StateChecks = dict[FailureDescriptors, bool]
 
 StepInfo = dict[str, Any]
 StepReturn = tuple[
-    dict[AgentNameT, ExternalState],  # Observations
-    dict[AgentNameT, float],  # Rewards
-    dict[AgentNameT, bool],  # Dones
-    dict[AgentNameT, StepInfo],  # Infos,
+    ExternalState,  # Observations
+    float,  # Rewards
+    bool,  # Dones
+    StepInfo,  # Infos,
 ]

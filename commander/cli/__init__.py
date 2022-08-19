@@ -1,13 +1,12 @@
 from pathlib import Path
 
 import click
-from mkdocs.__main__ import serve_command as docs
 
-from commander.cli.simexp_base import SimulationExperimentCommand, simexp_command
-from commander.cli.tensorboard_setup import tensorboard
+
+from commander.simexp_base import SimulationExperimentCommand, simexp_command
 from commander.log import setup_logging
 
-docs.name = "docs"
+
 
 
 @click.group()
@@ -35,10 +34,7 @@ def cli(ctx: click.Context, output_dir: Path, verbose: bool) -> None:
     setup_logging(command=global_ctx.invoked_subcommand, debug=verbose)
 
 
-cli.add_command(tensorboard)
-cli.add_command(simexp_command(SimulationExperimentCommand.SIMULATE))
 cli.add_command(simexp_command(SimulationExperimentCommand.EXPERIMENT))
-cli.add_command(docs)
 
 
 def run() -> None:

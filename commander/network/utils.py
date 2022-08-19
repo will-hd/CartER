@@ -1,4 +1,5 @@
 """
+### utils.py ###
 Contains utilities for turning Python datatypes into byte-level networking
 datatypes.
 
@@ -26,7 +27,7 @@ class Format(str, Enum):
 
     INT_8 = "b"
     UINT_8 = "B"
-
+    
     INT_16 = ENDIANNESS + "h"
     UINT_16 = ENDIANNESS + "H"
 
@@ -151,7 +152,7 @@ def pack(fmt: Union[Format, str], obj: PackableT) -> bytes:
     if fmt is Format.NUL:
         return b""
 
-    if fmt is Format.STRING:
+    if fmt is Format.STRING:    
         assert isinstance(obj, str)
         size_bytes = pack(Format.UINT_32, len(obj))
 

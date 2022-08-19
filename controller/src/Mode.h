@@ -64,9 +64,9 @@ const String FailureModeStrings[] = {
 
 enum class ExperimentMode
 {
-    RUNNING,
-    FAILED,
-    DONE,
+    RUNNING, // set during experiment_start()
+    FAILED, // set during unsafe_run_trigger()
+    DONE, // set during experiment_stop()
 };
 
 extern const Configuration configuration;

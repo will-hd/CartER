@@ -7,16 +7,19 @@
 #include <Buttons.h>
 #include <TimerInterrupt.h>
 
+#include <RotaryEncoder.h>
+
 void loop_command_and_control()
 {
-    update_buttons();
-
-    // React to incoming packets
+    // update_buttons();
+    
     if (S.available() != 0)
     {
         packet_reactor.tick();
     }
 
+    // while (true)
+    // ReadRawAngle();
     // Observation
     observation_tick();
 

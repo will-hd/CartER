@@ -104,6 +104,33 @@ void PacketReactor::tick()
     case SetVelocityPacket::id:
     {
         std::unique_ptr<SetVelocityPacket> packet = _read_and_construct_packet<SetVelocityPacket>();
+        // id_tracker = packet->actobs_tracker;
+
+        // if (id_tracker == 255)
+        // {
+        //     CustomAccelStepper &astepper = get_astepper_by_id(packet->cart_id);
+
+        //     switch (packet->operation)
+        //     {
+        //     case SetOperation::ADD:
+        //         astepper.setSpeed(astepper.speed() + static_cast<float_t>(packet->value));
+        //         break;
+        //     case SetOperation::EQUAL:
+        //         astepper.setMaxSpeed(20000);
+        //         astepper.runToNewPosition(7000);
+        //         astepper.runToNewPosition(16000);
+        //         astepper.runToNewPosition(7000);
+        //         astepper.runToNewPosition(16000);
+
+        //         break;
+        //     case SetOperation::SUBTRACT:
+        //         astepper.setSpeed(astepper.speed() - static_cast<float_t>(packet->value));
+        //         break;
+        //     case SetOperation::NUL:
+        //         break;
+        //     }
+        // }
+
 
         if (trigger_ctx.run_mode == RunMode::CONSTANT_SPEED)
         {

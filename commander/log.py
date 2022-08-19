@@ -1,7 +1,6 @@
 import datetime as dt
 import logging
 from typing import Sequence, Type
-
 from commander.network.protocol import (
     DebugPacket,
     ErrorPacket,
@@ -54,7 +53,7 @@ def setup_logging(
         project_root_path = get_project_root()
 
         file_formatter = logging.Formatter("%(asctime)s %(name)-30s %(levelname)-8s %(message)s")
-        file_path = project_root_path / "logs" / f"commander_{now_str}{command_str}.log"
+        file_path = project_root_path / "logs" / f"commander_{now_str}.log"
         file_handler = logging.FileHandler(file_path)
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(logging.DEBUG)

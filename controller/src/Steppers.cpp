@@ -5,6 +5,7 @@
 #include <Mode.h>
 #include <Utils.h>
 #include <Limits.h>
+#include <RotaryEncoder.h>
 
 /*
  ! Stepper information:
@@ -57,7 +58,6 @@ void start_stepper_drivers()
     packet_sender.send_debug("Starting stepper drivers.");
     packet_sender.send_debug("Starting stepper driver 1.");
     stepper1.getCurrentStallGuardReading(); // We need this to initialise, apparently
-
     if (configuration == TWO_CARRIAGES)
     {
         packet_sender.send_debug("Starting stepper driver 1.");

@@ -21,7 +21,7 @@ const unsigned int STEPPER_MICROSTEPS = 8;
 const unsigned int STEPPER_RANDOM_OFFTIME = 0;
 const float STEPPER_STEP_DISTANCE = 200.0;
 const float STEPPER_BIG_DISTANCE = 5000.0; // Must be bigger than max length movable in mm
-const float STEPPER_SAFETY_MARGIN_DISTANCE = 50.0;
+const float STEPPER_SAFETY_MARGIN_DISTANCE = 50.0; // TODO - make bigger
 
 const int STEPPER1_EN_PIN = 24;
 const int STEPPER1_CS_PIN = 9;

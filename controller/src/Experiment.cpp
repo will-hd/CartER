@@ -14,8 +14,11 @@
 uint32_t last_observation_us = 0;
 uint32_t last_memory_us = 0;
 
+int obs_cntr = 0; // not needed don't think - tried as ugly way of preventing obervation
+
 void observation_tick()
 {
+    obs_cntr++;
     if (!is_observing)
     {
         return;
@@ -25,13 +28,7 @@ void observation_tick()
     {
         // Update last observation
         last_observation_us = micros();
-
         send_observation(1);
-
-        if (configuration == TWO_CARRIAGES)
-        {
-            send_observation(2);
-        }
     }
 
     if (static_cast<uint32_t>(micros()) - last_memory_us >= MEMORY_INTERVAL_US)
@@ -52,10 +49,13 @@ void send_observation(uint8_t cart_id)
 
     CustomAccelStepper &astepper = get_astepper_by_id(cart_id);
     int32_t position_step = astepper.currentPosition();
-
-    CustomAMS_5600 *rot_encoder = get_rot_encoder_by_id(cart_id);
-    // repurposed as packet id for now
-    float_t angle_deg = id_tracker; // rot_encoder->readAngleDeg();
+    // if (obs_cntr > 100)
+    // AMS_5600 &rot_encoder = get_rot_encoder_by_id(cart_id);
+    // GetAngle();
+    // float_t ;
+    
+    float_t angle_deg = 1.00;
+    // float_t velocity_step = astepper.speed(); //angle_deg = id_tracker; // rot_encoder->readAngleDeg();
     uint32_t actions_done_counter = Actions_Done_Counter;
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
