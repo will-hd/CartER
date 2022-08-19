@@ -1,11 +1,12 @@
 CartER
 ==========
 
-CartER is my summer project at the Biological and Soft Systems (BSS) Sector of Cavendish Laboratory, University of Cambridge.
+CartER is my summer project at the Biological and Soft Systems (BSS) sector of Cavendish Laboratory, University of Cambridge.
 
 It is a continuation of the project undertaken by
-[Jeppe Klitgaard](https://github.com/JeppeKlitgaard/CartER/)
+[Jeppe Klitgaard](https://github.com/JeppeKlitgaard/CartER/) in 2021.
 
+This branch is a refactored version of Jeppe's work that considers only a single cart agent. Issues with the original version can be read [here](https://jeppeklitgaard.github.io/CartER/articles/handover_v1/#what-does-not-work). The single cart version has been simplified, ideally to work seamlessly with the well-known OpenAI gym API.
 
 TODO
 
@@ -15,7 +16,7 @@ The goal is to use Reinforcement Learning (RL) algorithms to accomplish certain 
 
 An in-sillica approach is also done in Python, though the experimental part of the project is an important part and the simulated approach is only complementary.
 
-## Command-line usage
+## Command-line usage [Currently redundant with CartER-single]
 
 Install with:
 
