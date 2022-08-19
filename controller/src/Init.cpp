@@ -3,7 +3,7 @@
 #include <Mode.h>
 #include <Limits.h>
 
-Mode mode = JOYSTICK;
+Mode mode = COMMAND_AND_CONTROL;
 
 const Configuration configuration = ONE_CARRIAGES;
 

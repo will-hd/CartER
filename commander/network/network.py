@@ -7,7 +7,7 @@ from typing import Literal, Optional, Sequence, Type, Union, cast, overload
 from serial import Serial
 
 from commander.log import EXCLUDE_PACKETS
-from commander.network.constants import DEFAULT_BAUDRATE, DEFAULT_PORT
+from commander.network.network_constants import DEFAULT_BAUDRATE, DEFAULT_PORT
 from commander.network.exceptions import PacketReadError
 from commander.network.protocol import (
     INBOUND_PACKET_ID_MAP,
@@ -30,6 +30,52 @@ DigestCallback = Callable[[], None]
 
 
 class NetworkManager:
+    """
+    A class for the NetworkManager.
+    ...
+
+    Attributes
+    ----------
+    serial : Serial port class POSIX implementation.
+        port : str
+            serial port being used to connect to the arduino
+        baudrate : int
+            rate (bits per second) that the serial reads**
+    packet_buffer : list[Packet]
+        buffer storing incoming packets
+
+    Methods
+    -------
+    open():
+        Opens serial port
+    close():
+        Closes serial port
+    tick():
+        None
+    in_queue():
+        returns number of bytes in input buffer
+    read_initial_output():
+    realign_packets():
+
+    reset_buffers():
+        Sleep 25ms and then flush buffers
+    assert_ping_pong():
+        Does Ping ⟷ Pong connection check.
+    read_packet():
+    read_packets():
+    dump_packets():
+    printer_callback():
+    digest():
+        Reads all the packets currently waiting to be read and stores them
+        in the internal packet buffer.
+    get_packet():
+        Pops a packet from the internel buffer. Can be selective in which packet 
+        to pop, and block until the packet arrives. If defined, `callback` is 
+        called after every digest.
+    send_packet():
+        Writes packet to serial.
+    """
+    
     INITIAL_OUTPUT_STOP_MARKER: bytes = InfoPacket("END OF INITIALISATION\n").to_bytes()
     PACKET_REALIGNMENT_SEQUENCE: bytes = InfoPacket(
         "=*= Please realign packets here =*=\n"
@@ -43,9 +89,12 @@ class NetworkManager:
         self.packet_buffer: list[Packet] = []
 
     def open(self) -> None:
+        """Open port with current settings. This may throw a SerialException
+        if the port cannot be opened."""
         self.serial.open()
 
     def close(self) -> None:
+        """Close port"""
         self.serial.close()
 
     def tick(self) -> None:
@@ -53,9 +102,18 @@ class NetworkManager:
 
     @property
     def in_queue(self) -> int:
+        """Return the number of bytes currently in the input buffer."""
         return cast(int, self.serial.in_waiting)
 
     def read_initial_output(self, print_: bool = True) -> str:
+        """
+        Reads the initial serial output. Called during setup of the CartpoleEnv.
+
+        Parameters:
+            print_ (bool): Choose whether to print initial output 
+        Returns:
+            read_bytes (str): inital bytes as ascii
+        """
         self.serial.timeout = 0.1
 
         read_bytes = b""
@@ -74,6 +132,9 @@ class NetworkManager:
         return read_bytes.decode("ascii", errors="ignore")
 
     def realign_packets(self, print_: bool = True) -> None:
+        """
+        Trys to realign packet stream by sending RequestPacketRealignmentPacket().
+        """
         request_realignment_pkt = RequestPacketRealignmentPacket()
         self.send_packet(request_realignment_pkt)
 
@@ -108,7 +169,7 @@ class NetworkManager:
         return cls.__cpp_decl("PACKET_REALIGNMENT_SEQUENCE", cls.PACKET_REALIGNMENT_SEQUENCE)
 
     def reset_buffers(self, wait: float = 0.025) -> None:
-        # sleep 25ms and then flush buffers
+        """Sleep for time (default 25ms) and then flush buffers."""
         sleep(wait)
         self.serial.reset_input_buffer()
         self.serial.reset_output_buffer()
@@ -130,8 +191,17 @@ class NetworkManager:
         assert pong_pkt.timestamp == checksum
 
     def read_packet(self, auto_realign: bool = True) -> InboundPacket:
+        """
+        Trys to read packet from serial buffer.
+        Parameters:
+            auto_realign (bool)
+        Returns:
+            Packet
+        """
+        # Get packet ID
         id_ = self.serial.read(1)
-
+        
+        # Match packet ID
         try:
             packet_cls = INBOUND_PACKET_ID_MAP[id_]
         except KeyError as id_exc:
@@ -143,15 +213,13 @@ class NetworkManager:
                 self.realign_packets()
 
                 return NullPacket()
-
             else:
                 raise PacketReadError("Invalid packet ID", id_, dump_buf=self.serial) from id_exc
-
+        # Read packet
         try:
             packet = packet_cls.read(self.serial)
             if not type(packet) in EXCLUDE_PACKETS:
                 logger.debug("Read packet: %s", packet, extra={"packet": packet})
-
         except (PacketReadError, ValueError) as read_exc:
             logger.warn("Failed to read packet. Got exception: %s", read_exc)
 
@@ -161,13 +229,15 @@ class NetworkManager:
                 self.realign_packets()
 
                 return NullPacket()
-
             else:
                 raise read_exc
 
         return packet
 
     def read_packets(self, block: bool = False, auto_realign: bool = True) -> list[Packet]:
+        """
+        Reads all packets from input buffer. If block, waits until a packet arrives.
+        """
         packets: list[Packet] = []
 
         while self.serial.in_waiting or (block and not packets):
@@ -176,6 +246,13 @@ class NetworkManager:
         return packets
 
     def dump_packets(self, *, digest: bool = True, continuous: bool = False) -> None:
+        """
+        Removes and prints a packet from the internal buffer.
+        Parameters:
+            digest (bool)
+            continuous (bool)
+                removes and prints all packets from buffer
+        """
         if continuous and not digest:
             raise ValueError("Invalid combination of arguments. Must digest to be continuous")
 
@@ -190,7 +267,7 @@ class NetworkManager:
 
     def digest(self, block: bool = False, auto_realign: bool = True) -> None:
         """
-        Digests all the packets currently waiting to be read and stores them
+        Reads all the packets currently waiting to be read and stores them
         in the internal packet buffer.
         """
         packets = self.read_packets(block=block, auto_realign=auto_realign)
@@ -272,11 +349,25 @@ class NetworkManager:
         _excludes: Optional[Sequence[PacketT]] = None,
     ) -> Optional[PacketT]:
         """
-        Pops a packet from the internel buffer.
+        Pops a packet from the internal buffer. Can be selective in which packet 
+        to pop, and block until the packet arrives. If defined, `callback` is 
+        called after every digest.
 
-        Can be selective in which packet to pop, and block until the packet arrives.
+        Parameters:
+            packet_type
+            selector (PacketSelector)
+                allows for extra packet filtering e.g. only get packets that 
+                start with certain string 
+            pop
+            digest
+            block
+            callback
+            auto_realign (bool)
 
-        If defined, `callback` is called after every digest.
+            _excludes
+        Returns:
+            packet
+        
         """
 
         if block and not digest:
@@ -303,11 +394,10 @@ class NetworkManager:
                 # Skip if not right attributes
                 if selector is not None and not selector(trial):
                     continue
-
                 if packet in _excludes:
                     continue
 
-                # We have a match
+                # If not filterd by above, we have a match
                 packet = trial
 
                 if pop:
@@ -386,6 +476,9 @@ class NetworkManager:
             packets.append(packet)
 
     def send_packet(self, packet: OutboundPacket) -> None:
+        """
+        Writes packet to serial.
+        """
         logger.debug("Sent packet: %s", packet, extra={"packet": packet})
 
         bytes_to_transfer = packet.to_bytes()

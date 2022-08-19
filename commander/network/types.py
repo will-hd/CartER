@@ -1,3 +1,9 @@
+"""
+### types.py ###
+
+Defines custom types used in networking protocol.
+"""
+
 from collections.abc import Callable
 from typing import TypeVar
 

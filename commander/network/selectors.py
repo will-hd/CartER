@@ -1,5 +1,5 @@
-from commander.network.protocol import InfoPacket, MessagePacketBase
-from commander.network.types import PacketSelector
+from network.protocol import InfoPacket, MessagePacketBase
+from network.types import PacketSelector
 
 
 def limit_finding_done() -> PacketSelector[InfoPacket]:
