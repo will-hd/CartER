@@ -254,7 +254,8 @@ public:
     uint32_t _timestamp_micros;
     uint8_t _cart_id;
     int32_t _position_steps;
-    float_t _angle_degs;
+    float_t _velocity_steps;
+    int16_t _angle_degs;
     uint32_t _actions_done_counter;
 
     static const byte id = 0x40; // @
@@ -264,7 +265,7 @@ public:
 
     virtual byte get_id() const override;
 
-    virtual void construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t angle_degs, uint32_t actions_done_counter);
+    virtual void construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t velocity_steps, int16_t angle_degs, uint32_t actions_done_counter);
     virtual RawPacket to_raw_packet() const override;
 };
 

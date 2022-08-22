@@ -26,6 +26,7 @@ void observation_tick()
 
     if (static_cast<uint32_t>(micros() - last_observation_us) >= OBSERVATION_INTERVAL_US)
     {
+        requestData();
         // Update last observation
         last_observation_us = micros();
         send_observation(1);
@@ -45,22 +46,31 @@ void observation_tick()
 
 void send_observation(uint8_t cart_id)
 {
+    requestData();
+
     uint32_t timestamp_micros = micros();
 
     CustomAccelStepper &astepper = get_astepper_by_id(cart_id);
     int32_t position_step = astepper.currentPosition();
+    float_t velocity_step = astepper.speed(); //angle_deg = id_tracker; // rot_encoder->readAngleDeg();
+
     // if (obs_cntr > 100)
     // AMS_5600 &rot_encoder = get_rot_encoder_by_id(cart_id);
     // GetAngle();
     // float_t ;
     
-    float_t angle_deg = 1.00;
-    // float_t velocity_step = astepper.speed(); //angle_deg = id_tracker; // rot_encoder->readAngleDeg();
+    // recvWithStartEndMarkers();
+    // showNewData();
+    
+    
     uint32_t actions_done_counter = Actions_Done_Counter;
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
+    recvWithStartEndMarkers();
+    int16_t angle_deg = getAngle();
+    // packet_sender.send_debug(std::to_string(angle_deg));
 
-    packet->construct(timestamp_micros, cart_id, position_step, angle_deg, actions_done_counter);
+    packet->construct(timestamp_micros, cart_id, position_step, velocity_step, angle_deg, actions_done_counter);
 
     packet_sender.send(std::move(packet));
 }

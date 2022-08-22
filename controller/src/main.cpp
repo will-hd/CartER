@@ -61,7 +61,7 @@ void setup()
     // setup_I2C_multiplexer();
     
     // Rotary Encoders
-    
+    getInitAngle();
     
     // Limit Switches
     setup_limit_switches();

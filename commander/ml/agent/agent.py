@@ -218,11 +218,12 @@ class CartpoleAgent():
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
 
-        # velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
-        # self.network_manager.send_packet(velo_pkt)
-
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
+        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
         self.network_manager.send_packet(velo_pkt)
+
+        # Used to prevent cart moving - for testing
+        # velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
+        # self.network_manager.send_packet(velo_pkt)
         
         
         # self.action_counter += 1
