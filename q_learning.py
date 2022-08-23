@@ -14,7 +14,7 @@ class Q:
 
     def __init__(self, env) -> None:
         self.env = env
-        self.obs = env.reset()
+        # self.obs = env.reset()
 
     def Qtable(self, state_space, action_space, bin_size = 30):
         """
