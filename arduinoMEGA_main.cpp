@@ -47,6 +47,18 @@ void sendData(){
 
     Serial1.write(arr, 6);
 
+
+    /* Didn't work!! think unsigned/signed ints causing issue*/
+    // arr[0] = '<';
+    
+    // arr[1] = (uint8_t) intAngle >> 8;   // >>>> >>>> 0001 0110
+    // arr[2] = (uint8_t) intAngle & mask; // ____ ____ 0100 0111
+    // // Signed int!
+    // arr[3] = (int8_t) intSpeed >> 8;   // >>>> >>>> 0001 0110
+    // arr[4] = (int8_t) intSpeed & mask; // ____ ____ 0100 0111
+
+    // arr[5] = '>';
+
     // Serial1.write('<');
     // Serial1.write(highByte1);
     // Serial1.write(lowByte1);
