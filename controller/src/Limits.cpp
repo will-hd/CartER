@@ -373,6 +373,11 @@ void react_limit_check(int32_t left_limit_new_position) {
 
 
 void do_jiggle() {
+
+    // Shouldn't be here really, but for now... (till i forget)
+    serial1Flush();
+
+
     // float_t astepper1_orig_speed = astepper1.maxSpeed();
     // float_t astepper2_orig_speed;
     // astepper1.setMaxSpeedDistance(JIGGLE_SPEED_DISTANCE);
