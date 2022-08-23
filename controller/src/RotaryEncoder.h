@@ -4,6 +4,8 @@
 void showNewData();
 void getInitAngle();
 int getAngle();
+int getSpeed();
+void serial1Flush();
 int getRawAngle();
 void requestData();
 void recvWithStartEndMarkers();

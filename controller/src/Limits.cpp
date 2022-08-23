@@ -4,6 +4,7 @@
 #include <Init.h>
 #include <Protocol.h>
 #include <TimerInterrupt.h>
+#include <RotaryEncoder.h> // for serial1 flush
 
 #include <DebugUtils.h>
 

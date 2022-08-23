@@ -46,7 +46,7 @@ void observation_tick()
 
 void send_observation(uint8_t cart_id)
 {
-    requestData();
+
 
     uint32_t timestamp_micros = micros();
 
@@ -67,8 +67,11 @@ void send_observation(uint8_t cart_id)
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
     recvWithStartEndMarkers();
-    int16_t angle_deg = getAngle();
-    // packet_sender.send_debug(std::to_string(angle_deg));
+
+    int16_t velocity_angle = getSpeed();
+    int16_t angle_deg = 1; // getAngle();
+    
+    // packet_sender.send_debug(std::to_string(velocity_angle));
 
     packet->construct(timestamp_micros, cart_id, position_step, velocity_step, angle_deg, actions_done_counter);
 
