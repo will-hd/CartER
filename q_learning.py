@@ -7,7 +7,7 @@ import stable_baselines3
 from commander.ml.environment import ExperimentalCartpoleEnv
 from commander.log import setup_logging
 
-setup_logging(debug=True, file=False)
+setup_logging(debug=False, file=False)
 env = ExperimentalCartpoleEnv()
 
 class Q:
@@ -20,8 +20,11 @@ class Q:
         """
         Initialises q-table, with given bin size.
         """
-        bins = [np.linspace(0,25000,bin_size),
-                np.linspace(-5000,5000,bin_size)]
+        bins = [
+                np.linspace(0,25000,bin_size), # x
+                np.linspace(-5000,5000,bin_size), # dx
+                np.linspace(0,4096,bin_size), # theta
+                ] 
 
         q_table = np.random.uniform(low=-1,high=1,size=([bin_size] * state_space + [action_space]))
         return q_table, bins
@@ -126,7 +129,7 @@ class Q:
         
     
     def Train(self):
-        self.q_table, self.bins = self.Qtable(state_space=2, action_space=2)
+        self.q_table, self.bins = self.Qtable(state_space=3, action_space=2)
         print(self.q_table.shape)
         print(self.bins)
         self.Q_learning(self.q_table, self.bins, lr = 0.15, gamma = 0.995, episodes = 300, timestep = 2)

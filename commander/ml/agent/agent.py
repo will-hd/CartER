@@ -111,6 +111,7 @@ class CartpoleAgent():
         self: CartpoleAgentT,
         max_steps: int = 3000,
         settled_x_threshold: float = 5.0,
+        settled_theta_threshold: float = 2.0,
         observation_maximum_interval: int = 10 * 1000,  # us
         action_minimum_interval: float = 0.003,  # s
         action_maximum_interval: float = 0.010,
@@ -135,7 +136,10 @@ class CartpoleAgent():
         self._state: Optional[ExternalState] = None
         self.observation_buffer_size = 100
 
+        # Settled thresholds
         self.settled_x_threshold = settled_x_threshold
+        self.settled_theta_threshold = settled_theta_threshold
+
         # Timing intervals
         self.action_minimum_interval = action_minimum_interval
         self.action_maximum_interval = action_maximum_interval
@@ -177,11 +181,11 @@ class CartpoleAgent():
         # self.network_manager.send_packet(pkt)
 
         
-        random_start = np.random.randint(low=-1000, high=1000)
-        print(f"Random starting velocity: {random_start}")
-        # Random start conditions
-        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=random_start, actobs_tracker=1)
-        self.network_manager.send_packet(velo_pkt)
+        # random_start = np.random.randint(low=-1000, high=1000)
+        # print(f"Random starting velocity: {random_start}")
+        # # Random start conditions
+        # velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=random_start, actobs_tracker=1)
+        # self.network_manager.send_packet(velo_pkt)
         
         state = self.observe()
 
@@ -218,12 +222,12 @@ class CartpoleAgent():
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
 
-        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
-        self.network_manager.send_packet(velo_pkt)
+        # velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
+        # self.network_manager.send_packet(velo_pkt)
 
         # Used to prevent cart moving - for testing
-        # velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
-        # self.network_manager.send_packet(velo_pkt)
+        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
+        self.network_manager.send_packet(velo_pkt)
         
         
         # self.action_counter += 1
@@ -325,7 +329,7 @@ class CartpoleAgent():
 
     def absorb_packet(self, packet: CartSpecificPacket) -> None:
         """
-        Takes in observation and updates the agent's state.
+        Takes in observation, updates the agent's current state, adds state to observation buffer.
         """
         if isinstance(packet, ObservationPacket):
             # Max value of uint32_t: 4_294_967_295
@@ -352,13 +356,17 @@ class CartpoleAgent():
 
                 x = packet.position_steps
                 dx = packet.velocity
+                theta = packet.angle_deg
+                dt = packet.dTime
 
                 self._state = np.array(
                     (
                         x,
                         dx,
+                        theta
                     )
                 )
+                # print(theta, dt)
                 self.agent_observation_buffer.append(self.observe())
 
         else:
@@ -368,10 +376,11 @@ class CartpoleAgent():
         """
         Returns True if the cart is considered settled."""
         xs = [state[0] for state in self.agent_observation_buffer]
+        thetas = [state[2] for state in self.agent_observation_buffer]
         return all(
             [
-                max(xs) - min(xs) <= self.settled_x_threshold
-                # max(thetas) - min(thetas) <= self.settled_theta_threshold,
+                max(xs) - min(xs) <= self.settled_x_threshold,
+                max(thetas) - min(thetas) <= self.settled_theta_threshold
             ]
         )
 
