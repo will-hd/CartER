@@ -59,7 +59,7 @@ void send_observation(uint8_t cart_id)
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
     recvWithBlocking();
 
-    uint16_t angle_deg = getAngle();
+    uint16_t angle_deg = getTaredAngle();
     uint16_t dTime = getTime();
 
     packet->construct(timestamp_micros, cart_id, position_step, velocity_step, angle_deg, dTime, actions_done_counter);

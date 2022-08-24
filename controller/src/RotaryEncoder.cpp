@@ -2,14 +2,14 @@
 #include <Wire.h> //This is for i2C
 #include <Protocol.h>
 
-// Example 3 - Receive with start- and end-markers
+// Inspired by https://forum.arduino.cc/t/serial-input-basics-updated/382007
 
 const byte numChars = 5;
 char receivedChars[numChars];
 
 boolean newData = false;
 boolean requestedData = false;
-int angleOffset = 0;
+unsigned short angleOffset = 0;
 
 void serial1Flush(){
     // packet_sender.send_debug("Flush"); 
@@ -66,8 +66,6 @@ void recvWithStartEndMarkers() {
     }
 }
 
-// char buf[4];
-
 void recvWithBlocking(){
     // static boolean recvInProgress = false;
     // static byte ndx = 0;
@@ -99,21 +97,20 @@ void requestData(){
 }
 
 int getRawAngle(){
-
-    char highByte_show = receivedChars[0];
-    char lowByte_show = receivedChars[1];
-    uint16_t recombined_int = (highByte_show << 8) | lowByte_show;
-    
-    newData == false;
-//    int shifted_angle = (360 + angleOffset - recombined_int) % 360;
-    return recombined_int;
-}
-
-unsigned short getAngle(){
     char highByte_show = receivedChars[0];
     char lowByte_show = receivedChars[1];
     unsigned short recombined_int = (highByte_show << 8) | lowByte_show;
+
     return recombined_int;
+}
+
+unsigned short getTaredAngle(){
+    char highByte_show = receivedChars[0];
+    char lowByte_show = receivedChars[1];
+    unsigned short recombined_int = (highByte_show << 8) | lowByte_show;
+    unsigned short shifted_angle = (4096 + angleOffset - recombined_int) % 4096;
+
+    return shifted_angle;
 }
 unsigned short getTime() {
     char highByte_show = receivedChars[2];
@@ -123,26 +120,11 @@ unsigned short getTime() {
     return recombined_int;
 }
 
-// std::array<int, 2> getData(){
-//     if (newData == true){
-//         char highByte1_show = receivedChars[0];
-//         char lowByte1_show = receivedChars[1];
-//         char highByte2_show = receivedChars[2];
-//         char lowByte2_show = receivedChars[3];
-
-//         int16_t recombined_angle = (highByte1_show << 8) | lowByte1_show;
-//         int16_t recombined_speed = (highByte2_show << 8) | lowByte2_show;
-
-//         int shifted_angle = (360 + angleOffset - recombined_int) % 360;
-//         newData = false;
-//         return {shifted_angle, recombined_speed};
-// }
-
 void showNewData() {
     
     if (newData == true) {
         // Serial.println(receivedChars);
-        int angle = getAngle();
+        int angle = getTaredAngle();
         // int shifted_angle = (360 + angleOffset - angle) % 360;
         packet_sender.send_debug(std::to_string(angle));
         newData = false;
@@ -152,11 +134,10 @@ void showNewData() {
 void getInitAngle() {
     // Request
     requestData();
-    delay(100);
-    
+        
     // Receive
     recvWithBlocking();
     angleOffset = getRawAngle();
 
-    packet_sender.send_debug(std::to_string(angleOffset));
+    packet_sender.send_debug("INIT ANGLE: "+std::to_string(angleOffset));
 }

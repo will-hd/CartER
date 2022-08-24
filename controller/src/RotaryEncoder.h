@@ -3,7 +3,7 @@
 
 void showNewData();
 void getInitAngle();
-unsigned short getAngle();
+unsigned short getTaredAngle();
 unsigned short getTime();
 void serial1Flush();
 int getRawAngle();
