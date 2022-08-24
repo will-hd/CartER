@@ -66,10 +66,12 @@ void send_observation(uint8_t cart_id)
     uint32_t actions_done_counter = Actions_Done_Counter;
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
-    recvWithStartEndMarkers();
+    recvWithBlocking();
 
-    int16_t velocity_angle = getSpeed();
-    int16_t angle_deg = 1; // getAngle();
+    // uint16_t velocity_angle = getTime();
+    packet_sender.send_debug(std::to_string(getTime())); 
+    packet_sender.send_debug(std::to_string(getAngle()));
+    uint16_t angle_deg = 1; // getAngle();
     
     // packet_sender.send_debug(std::to_string(velocity_angle));
 
