@@ -140,13 +140,15 @@ byte DoJigglePacket::get_id() const { return DoJigglePacket::id; }
 ObservationPacket::ObservationPacket() : _timestamp_micros{0}, _cart_id{0}, _position_steps{0}, _velocity_steps{0}, _angle_degs{0}, _actions_done_counter{0}{}
 byte ObservationPacket::get_id() const { return ObservationPacket::id; }
 
-void ObservationPacket::construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps, float_t velocity_steps, int16_t angle_degs, uint32_t actions_done_counter)
+void ObservationPacket::construct(uint32_t timestamp_micros, uint8_t cart_id, int32_t position_steps,
+                                 float_t velocity_steps, uint16_t angle_degs, uint16_t dTime, uint32_t actions_done_counter)
 {
     _timestamp_micros = timestamp_micros;
     _cart_id = cart_id;
     _position_steps = position_steps;
     _velocity_steps = velocity_steps;
     _angle_degs = angle_degs;
+    _dTime = dTime;
     _actions_done_counter = actions_done_counter;
 }
 
@@ -161,6 +163,7 @@ RawPacket ObservationPacket::to_raw_packet() const
     raw_packet.add(this->_position_steps);
     raw_packet.add(this->_velocity_steps);
     raw_packet.add(this->_angle_degs);
+    raw_packet.add(this->_dTime);
     raw_packet.add(this->_actions_done_counter);
 
     return raw_packet;

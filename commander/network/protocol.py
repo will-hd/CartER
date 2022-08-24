@@ -355,13 +355,15 @@ class ObservationPacket(InboundPacket):
     id_ = byte(0x40)  # @
 
     def __init__(
-        self, timestamp_micros: int, cart_id: CartID, position_steps: int, velocity: float, angle_deg: int16, actions_done_counter: int
+        self, timestamp_micros: int, cart_id: CartID, position_steps: int, velocity: float,
+        angle_deg: uint16, dTime: uint16, actions_done_counter: int
     ) -> None:
         self.timestamp_micros = timestamp_micros
         self.cart_id = cart_id
         self.position_steps = position_steps
         self.velocity = velocity
         self.angle_deg = angle_deg
+        self.dTime = dTime
         self.actions_done_counter = actions_done_counter
 
     @classmethod
@@ -370,10 +372,9 @@ class ObservationPacket(InboundPacket):
         cart_id = CartID(unpack(Format.UINT_8, serial))
         position_steps = unpack(Format.INT_32, serial)
         velocity = unpack(Format.FLOAT_32, serial)
-        angle_deg = unpack(Format.INT_16, serial)
+        angle_deg = unpack(Format.UINT_16, serial)
+        dTime = unpack(Format.UINT_16, serial)
         actions_done_counter = unpack(Format.UINT_32, serial)
-
-        # Since angle unused currently, use it as another packet ID
 
         return cls(
             timestamp_micros=timestamp_micros,
@@ -381,6 +382,7 @@ class ObservationPacket(InboundPacket):
             position_steps=position_steps,
             velocity=velocity,
             angle_deg=angle_deg,
+            dTime = dTime,
             actions_done_counter = actions_done_counter
         )
 
