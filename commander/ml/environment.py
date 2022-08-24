@@ -330,7 +330,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         self.network_manager.send_packet(max_velo_pkt)
 
         # Set velocity
-        logger.info("Setting velocity")
+        logger.info("Setting velocity to zero")
         velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=1)
         self.network_manager.send_packet(velo_pkt)
 
@@ -362,7 +362,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         self.wait_for_settled()
 
         # Set velocity
-        logger.info("Setting velocity")
+        logger.info("Setting velocity to zero")
         velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=3)
         self.network_manager.send_packet(velo_pkt)
 
