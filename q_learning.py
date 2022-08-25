@@ -24,7 +24,7 @@ class Q:
         """
         bins = [
                 # np.linspace(0,25000,bin_size), # x
-                np.linspace(-5000,5000,bin_size), # dx
+                np.linspace(-15000,15000,bin_size), # dx
                 np.linspace(1796,2300,bin_size), # theta [1796, 2300]
                 np.linspace(-270,270,bin_size) # dtheta
                 ] 
