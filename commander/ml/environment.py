@@ -219,8 +219,8 @@ class ExperimentalCartpoleEnv(gym.Env):
 
         done = any(checks.values()) or any(dones.values())
 
-        # reward = self._agent.reward(observation) if not done else 0.0
-        reward = +1 if not done else 0.0
+        reward = self._agent.reward(observation) if not done else 0.0
+        # reward = +1 if not done else 0.0
         # logger.debug(f"obs2: {observation}, rew: {reward}")
         self.steps += 1
 

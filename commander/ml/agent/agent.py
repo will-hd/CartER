@@ -232,7 +232,7 @@ class CartpoleAgent():
         self.action_freq_ticker.tick()
 
         # action of 1 is to RIGHT, action of 0 is to the LEFT
-        speed_increment = 500
+        speed_increment = 800
         speed_increment *= 1 if action == Action.RIGHT else -1
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
@@ -273,8 +273,11 @@ class CartpoleAgent():
         This function takes in a state and returns the appropriate reward.
         """
         # TODO 2/5
-        x = state[0]
-        rew = cast(float, np.sin(x / self.track_length * np.pi)**8)
+        # x = self._state[2]
+        theta = self._state[2]
+        rew = cast(float, np.cos((theta - 2048) / (self.failure_angle[1]-self.failure_angle[0]) * np.pi)**2)
+        # rew = cast(float, np.sin(x / self.track_length * np.pi)**8)
+        print(rew)
         return rew
 
     def check_state(self, state: ExternalState) -> StateChecks:
