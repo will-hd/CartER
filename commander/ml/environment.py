@@ -213,7 +213,7 @@ class ExperimentalCartpoleEnv(gym.Env):
 
         checks = self._agent.check_state(observation)
 
-        if checks[FailureDescriptors.MAX_STEPS_REACHED]:
+        if checks[FailureDescriptors.MAX_STEPS_REACHED] or checks[FailureDescriptors.ANGLE_LEFT] or checks[FailureDescriptors.ANGLE_RIGHT]:
             # to speed up end
             self.failure_id = True
 
@@ -547,7 +547,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         logger.info("Ending experiment")
         
         if self.failure_id:
-            logger.info("Setting velocity to speed up end")
+            logger.info("Setting velocity to zero to speed up end")
             velo_end_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=0, actobs_tracker=0)
             self.network_manager.send_packet(velo_end_pkt)
 
