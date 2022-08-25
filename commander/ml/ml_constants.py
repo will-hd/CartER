@@ -18,3 +18,6 @@ class FailureDescriptors(str, Enum):
 
     POSITION_LEFT = "position/left"
     POSITION_RIGHT = "position/right"
+
+    ANGLE_LEFT = "angle/left"
+    ANGLE_RIGHT = "angle/right"

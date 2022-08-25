@@ -111,7 +111,8 @@ class CartpoleAgent():
         self: CartpoleAgentT,
         max_steps: int = 3000,
         settled_x_threshold: float = 5.0,
-        settled_theta_threshold: float = 2.0,
+        settled_down_theta_threshold: float = 2.0,
+        settled_up_theta_threshold: float = 2.0,
         observation_maximum_interval: int = 10 * 1000,  # us
         action_minimum_interval: float = 0.003,  # s
         action_maximum_interval: float = 0.010,
@@ -133,17 +134,24 @@ class CartpoleAgent():
         self.info: Mapping[str, Any] = {}
 
         # This is private for a reason
-        self._state: Optional[ExternalState] = None
+        self._state: Optional[ExternalState] = np.zeros(4) # = None
         self.observation_buffer_size = 100
 
         # Settled thresholds
         self.settled_x_threshold = settled_x_threshold
-        self.settled_theta_threshold = settled_theta_threshold
+        self.settled_down_theta_threshold = settled_down_theta_threshold
+        self.settled_up_theta_threshold = settled_up_theta_threshold
+
 
         # Timing intervals
         self.action_minimum_interval = action_minimum_interval
         self.action_maximum_interval = action_maximum_interval
         self.observation_maximum_interval = observation_maximum_interval
+
+        # Used for estimating angular velocity
+        self.dTime = 1
+
+        self.failure_angle = [1796, 2300]
 
         self.setup()
         self.update_goal(self.goal_params)
@@ -161,11 +169,18 @@ class CartpoleAgent():
         """
         
         self.agent_observation_buffer: Deque[ExternalState] = deque(maxlen=self.observation_buffer_size)
+
+        # Initialise so non empty for first obs (otherwise get TypeError: 'NoneType' object is not subscriptable)
+        self.agent_observation_buffer.append([0,0,0,0])
+        self.agent_observation_buffer.append([0,0,0,0])
+        # print(self.agent_observation_buffer[-2][2])
+
+
         self.last_observation_interval: float = 0
         self.last_observation_time: int = 0
         self.last_action_time: float = 0.0
         self.action_freq_ticker.clear()
-        self._state: Optional[ExternalState] = None
+        self._state: Optional[ExternalState] = np.zeros(4) # = None
 
     def reset(self) -> ExternalState:
         """
@@ -217,17 +232,17 @@ class CartpoleAgent():
         self.action_freq_ticker.tick()
 
         # action of 1 is to RIGHT, action of 0 is to the LEFT
-        speed_increment = 200
+        speed_increment = 500
         speed_increment *= 1 if action == Action.RIGHT else -1
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
 
-        # velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
-        # self.network_manager.send_packet(velo_pkt)
-
-        # Used to prevent cart moving - for testing
-        velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
+        velo_pkt = SetVelocityPacket(SetOperation.ADD, cart_id=self.cart_id, value=speed_increment, actobs_tracker=rand_numb)
         self.network_manager.send_packet(velo_pkt)
+
+        # # Used to prevent cart moving - for testing
+        # velo_pkt = SetVelocityPacket(SetOperation.EQUAL, cart_id=self.cart_id, value=0, actobs_tracker=rand_numb)
+        # self.network_manager.send_packet(velo_pkt)
         
         
         # self.action_counter += 1
@@ -267,6 +282,7 @@ class CartpoleAgent():
         This function takes in a state and returns True if the state is not failed.
         """
         x = state[0]
+        theta = state[2]
         # Check if out of bounds - not actually being used yet!!
         # checks = {
         #     FailureDescriptors.POSITION_LEFT: x < self.failure_position[0],
@@ -276,6 +292,8 @@ class CartpoleAgent():
         checks = {
             FailureDescriptors.POSITION_LEFT: False,
             FailureDescriptors.POSITION_RIGHT: False,
+            FailureDescriptors.ANGLE_LEFT: theta < self.failure_angle[0],
+            FailureDescriptors.ANGLE_RIGHT: theta > self.failure_angle[1]
         }
 
         checks[FailureDescriptors.MAX_STEPS_REACHED] = self.steps >= self.max_steps
@@ -327,6 +345,34 @@ class CartpoleAgent():
         ## Update track length
         self.__dict__ |= goal_params
 
+    def estimate_angular_velocity(self) -> float:
+        dt = self.dTime # time when
+        # print(self._state[2])
+        raw = self._state[2] - self.agent_observation_buffer[-2][2] # newAngle - oldAngle
+        # print(self.agent_observation_buffer[-2][2])
+
+        if raw == 0:
+            angular_speed = 0
+        else:
+            abs_raw = abs(raw)
+
+            # modified from https://stackoverflow.com/a/57315426 <- incorrect sign during angle wrap around
+            # assumes smaller angle is correct, first term is "modular" arithmetic in C++ (rather than remainder)
+            # see https://stackoverflow.com/a/44197900]
+            abs_dtheta = min((-abs_raw)%4096, abs_raw%4096)
+
+
+            # hacky way of making sure direction is preserved at 360 -> 0 wrap around
+            # assume that if the angle jump is greater than 2000, we have passed through zero...
+            if (abs_raw > 2000):
+                direction = -1*(abs_raw / raw) # since both floats, need to check not equal to zero to prevent nan/inf
+            else:
+                direction = (abs_raw / raw)
+
+            angular_speed = direction * abs_dtheta / dt * 1e5
+        return angular_speed
+
+
     def absorb_packet(self, packet: CartSpecificPacket) -> None:
         """
         Takes in observation, updates the agent's current state, adds state to observation buffer.
@@ -357,31 +403,43 @@ class CartpoleAgent():
                 x = packet.position_steps
                 dx = packet.velocity
                 theta = packet.angle_deg
-                dt = packet.dTime
+                self.dTime = packet.dTime
 
+                
                 self._state = np.array(
                     (
                         x,
                         dx,
-                        theta
+                        theta,
+                        self.estimate_angular_velocity()
                     )
                 )
-                # print(theta, dt)
+                # print(self._state)
+                # print(theta, self.dTime) # dt roughly 4012 with no angle offset calculation
                 self.agent_observation_buffer.append(self.observe())
 
         else:
             raise TypeError(f"Agent does not handle {type(packet)}")
     
-    def is_settled(self) -> bool:
+    def is_settled(self, settle_upright: bool = False) -> bool:
         """
         Returns True if the cart is considered settled."""
         xs = [state[0] for state in self.agent_observation_buffer]
         thetas = [state[2] for state in self.agent_observation_buffer]
-        return all(
-            [
-                max(xs) - min(xs) <= self.settled_x_threshold,
-                max(thetas) - min(thetas) <= self.settled_theta_threshold
-            ]
-        )
+
+        if settle_upright:
+            return all(
+                [
+                    max(xs) - min(xs) <= self.settled_x_threshold,
+                    max(thetas) - min(thetas) <= self.settled_up_theta_threshold
+                ]
+            )
+        else:
+            return all(
+                [
+                    max(xs) - min(xs) <= self.settled_x_threshold,
+                    max(thetas) - min(thetas) <= self.settled_down_theta_threshold
+                ]
+            )
 
 CartpoleAgentT = TypeVar("CartpoleAgentT", bound=CartpoleAgent)

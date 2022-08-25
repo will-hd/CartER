@@ -10,20 +10,23 @@ from commander.log import setup_logging
 setup_logging(debug=False, file=False)
 env = ExperimentalCartpoleEnv()
 
+
+# https://github.com/maciejbalawejder/ReinforcementLearning-collection/blob/main/Q-Table/Qtable.ipynb
 class Q:
 
     def __init__(self, env) -> None:
         self.env = env
         # self.obs = env.reset()
 
-    def Qtable(self, state_space, action_space, bin_size = 30):
+    def Qtable(self, state_space, action_space, bin_size = 20):
         """
         Initialises q-table, with given bin size.
         """
         bins = [
                 np.linspace(0,25000,bin_size), # x
                 np.linspace(-5000,5000,bin_size), # dx
-                np.linspace(0,4096,bin_size), # theta
+                np.linspace(1796,2300,bin_size), # theta [1796, 2300]
+                np.linspace(-270,270,bin_size) # dtheta
                 ] 
 
         q_table = np.random.uniform(low=-1,high=1,size=([bin_size] * state_space + [action_space]))
@@ -129,7 +132,7 @@ class Q:
         
     
     def Train(self):
-        self.q_table, self.bins = self.Qtable(state_space=3, action_space=2)
+        self.q_table, self.bins = self.Qtable(state_space=4, action_space=2) # also check that gym.spaces agree!!!
         print(self.q_table.shape)
         print(self.bins)
         self.Q_learning(self.q_table, self.bins, lr = 0.15, gamma = 0.995, episodes = 300, timestep = 2)

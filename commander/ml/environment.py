@@ -188,6 +188,8 @@ class ExperimentalCartpoleEnv(gym.Env):
                
         # Take observation of experiment state
         observation = self._agent.observe()
+
+        print(self._agent.estimate_angular_velocity())
         # print(observation)
         # observation_dict = self._agent.observe_as_dict()
         # logger.debug(f"obs1: {observsation}")
@@ -216,7 +218,8 @@ class ExperimentalCartpoleEnv(gym.Env):
 
         done = any(checks.values()) or any(dones.values())
 
-        reward = self._agent.reward(observation) if not done else 0.0
+        # reward = self._agent.reward(observation) if not done else 0.0
+        reward = +1 if not done else 0.0
         # logger.debug(f"obs2: {observation}, rew: {reward}")
         self.steps += 1
 
@@ -291,6 +294,8 @@ class ExperimentalCartpoleEnv(gym.Env):
             [
                 -1000, #self.goal_params["failure_position"][0] * 2,  # Position
                 -np.finfo(np.float64).max,  # Velocity can be any float
+                0, # theta
+                -np.finfo(np.float64).max
             ],
             dtype=np.float64,
         )
@@ -298,6 +303,8 @@ class ExperimentalCartpoleEnv(gym.Env):
             [
                 +27000, #self.goal_params["failure_position"][1] * 2,  # Position
                 np.finfo(np.float64).max,  # Velocity can be any float
+                5000, # max only 4096
+                np.finfo(np.float64).max
             ],
             dtype=np.float64,
         )
@@ -433,20 +440,21 @@ class ExperimentalCartpoleEnv(gym.Env):
         """
         return self._agent
     
-    def is_settled(self) -> bool:
-        """Returns True if agent considers itself settled"""
-        return self._agent.is_settled()
-    
-    def wait_for_settled(self) -> None:
+    def wait_for_settled(self, settle_upright: bool = False) -> None:
         """
         Calls a network tick until system is settled.
         """
         logger.debug("Waiting for system to settle")
 
-        while not self.is_settled():
+        while not self.is_settled(settle_upright):
             self.network_tick()
 
         logger.debug("Experiment settled")
+
+    def is_settled(self, settle_upright: bool = False) -> bool:
+        """Returns True if agent considers itself settled"""
+        return self._agent.is_settled(settle_upright)
+
 
     def network_tick(self) -> None:
         """Ticks network by calling to digest and _process_buffer"""
