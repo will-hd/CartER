@@ -281,8 +281,8 @@ class CartpoleAgent():
         """
         This function takes in a state and returns True if the state is not failed.
         """
-        x = state[0]
-        theta = state[2]
+        x = self._state[0]
+        theta = self._state[2]
         # Check if out of bounds - not actually being used yet!!
         # checks = {
         #     FailureDescriptors.POSITION_LEFT: x < self.failure_position[0],
@@ -311,7 +311,7 @@ class CartpoleAgent():
         else:
             # TODO 2/5
             # Return state as np.array
-            return self._state
+            return self._state[1:]
 
     # def observe_as_dict(self) -> ExternalStateMap:
     #     """
@@ -416,7 +416,7 @@ class CartpoleAgent():
                 )
                 # print(self._state)
                 # print(theta, self.dTime) # dt roughly 4012 with no angle offset calculation
-                self.agent_observation_buffer.append(self.observe())
+                self.agent_observation_buffer.append(self._state)
 
         else:
             raise TypeError(f"Agent does not handle {type(packet)}")

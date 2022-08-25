@@ -23,7 +23,7 @@ class Q:
         Initialises q-table, with given bin size.
         """
         bins = [
-                np.linspace(0,25000,bin_size), # x
+                # np.linspace(0,25000,bin_size), # x
                 np.linspace(-5000,5000,bin_size), # dx
                 np.linspace(1796,2300,bin_size), # theta [1796, 2300]
                 np.linspace(-270,270,bin_size) # dtheta
@@ -132,7 +132,7 @@ class Q:
         
     
     def Train(self):
-        self.q_table, self.bins = self.Qtable(state_space=4, action_space=2) # also check that gym.spaces agree!!!
+        self.q_table, self.bins = self.Qtable(state_space=3, action_space=2) # also check that gym.spaces agree!!!
         print(self.q_table.shape)
         print(self.bins)
         self.Q_learning(self.q_table, self.bins, lr = 0.15, gamma = 0.995, episodes = 300, timestep = 2)
