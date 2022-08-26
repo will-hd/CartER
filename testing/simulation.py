@@ -9,20 +9,6 @@ import gym
 from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
-import platform
-from typing import Any, cast
-
-if platform.system() == "Windows":
-    from gym.envs.classic_control import rendering
-else:
-    from pyglet.canvas.xlib import NoSuchDisplayException
-
-    # Display detection
-    try:
-        from gym.envs.classic_control import rendering
-    except NoSuchDisplayException:
-        rendering = cast(Any, None)
-
 
 
 class CartPoleEnv(gym.Env):
@@ -44,6 +30,7 @@ class CartPoleEnv(gym.Env):
         1       Cart Velocity             -Inf                    Inf
         2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
         3       Pole Angular Velocity     -Inf                    Inf
+
     Actions:
         Type: Discrete(2)
         Num   Action
@@ -71,52 +58,57 @@ class CartPoleEnv(gym.Env):
         195.0 over 100 consecutive trials.
     """
 
-    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
+    metadata = {
+        'render.modes': ['human', 'rgb_array'],
+        'video.frames_per_second': 50
+    }
 
-    def __init__(self, unrestricted_mode=False, skip_steps=None, end_reward=1.0, x_threshold=2.4, weak=False):
-        
+    def __init__(self):
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
-        
-        self.unrestricted_mode = unrestricted_mode
-        self.skip_steps = skip_steps
-        #self.skip_steps = lambda: np.abs(np.random.normal(loc=4.0, scale=1.5, size=size)).astype('int')
-        self.end_reward = end_reward
-        self.weak = weak
-        
-        self.total_mass = self.masspole + self.masscart
+        self.total_mass = (self.masspole + self.masscart)
         self.length = 0.5  # actually half the pole's length
-        self.polemass_length = self.masspole * self.length
+        self.polemass_length = (self.masspole * self.length)
         self.force_mag = 10.0
         self.tau = 0.02  # seconds between state updates
-        self.kinematics_integrator = "euler"
+        self.kinematics_integrator = 'euler'
+
+
+        self.track_length = 10000
+        # self.x_dot = 0 
+        # self.x = self.track_length / 2 # sjtart at centre
+
+        self.speed_increment = 500
+        self.rot_friction = 0
 
         # Angle at which to fail the episode
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
-        self.x_threshold = x_threshold
+        print(self.theta_threshold_radians)
+        self.x_threshold = 10000
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation
-        # is still within bounds.   
-        high = np.array(
-            [
-                self.x_threshold * 2,
-                np.finfo(np.float32).max,
-                self.theta_threshold_radians * 2,
-                np.finfo(np.float32).max,
-            ],
-            dtype=np.float32,
-        )
-
+        # is still within bounds.
+        high = np.array([self.x_threshold * 2,
+                         np.finfo(np.float32).max,
+                         self.theta_threshold_radians * 2,
+                         np.finfo(np.float32).max],
+                        dtype=np.float32)
+        
+        low = np.array([0,
+                        -np.finfo(np.float32).max,
+                        -self.theta_threshold_radians * 2,
+                        -np.finfo(np.float32).max],
+                        dtype=np.float32)
+        
         self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.Box(-high, high, dtype=np.float32)
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
         self.seed()
         self.viewer = None
         self.state = None
 
         self.steps_beyond_done = None
-        self.reward_history = []
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -126,101 +118,76 @@ class CartPoleEnv(gym.Env):
         err_msg = "%r (%s) invalid" % (action, type(action))
         assert self.action_space.contains(action), err_msg
 
-        sim_steps = 1
+        x, x_dot, theta, theta_dot = self.state
+    
+        costheta = math.cos(theta)
+        sintheta = math.sin(theta)
+
+        x_dot_step = self.speed_increment if action == 1 else -self.speed_increment if action == 0 else 0.0
+        # x_dot += x_dot_step
+
+        # For the interested reader:
+        # https://coneural.org/florian/papers/05_cart_pole.pdf
+        # Eq (14):
+        xacc = x_dot_step / self.tau # + noise/random error
+
+        # thetaacc = 3.0 / (4.0 * self.masspole * self.length**2) * (
+        #     self.masspole*self.length * (
+        #     self.gravity*sintheta - xacc*costheta
+        #     ) - self.rot_friction*theta_dot
+        # )
+        thetaacc = 0
+
+        if self.kinematics_integrator == 'euler':
+            x = x + self.tau * x_dot
+            x_dot = x_dot + x_dot_step
+            theta = theta + self.tau * theta_dot
+            theta_dot = theta_dot + self.tau * thetaacc
+        else:  # semi-implicit euler
+            x_dot = x_dot + x_dot_step
+            x = x + self.tau * x_dot
+            theta_dot = theta_dot + self.tau * thetaacc
+            theta = theta + self.tau * theta_dot
+
+        self.state = ((x), x_dot, theta, theta_dot)
+
+        done = bool(
+            x < 0
+            or x > self.x_threshold
+            or theta < -self.theta_threshold_radians
+            or theta > self.theta_threshold_radians
+        )
         
-        if self.skip_steps is not None:
-            sim_steps = self.skip_steps()
-            
-        reward = 0.0
-        done = False
-            
-        while sim_steps > 0 and not done:
-            # print(sim_steps)
-            x, x_dot, theta, theta_dot = self.state
-            force = self.force_mag if action == 1 else -self.force_mag if action == 0 else 0.0
-            
-            costheta = math.cos(theta)
-            sintheta = math.sin(theta)
-
-            # For the interested reader:
-            # https://coneural.org/florian/papers/05_cart_pole.pdf
-            temp = (
-                force + self.polemass_length * theta_dot ** 2 * sintheta
-            ) / self.total_mass
-            thetaacc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
-            )
-            xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
-
-            if self.kinematics_integrator == "euler":
-                x = x + self.tau * x_dot
-                x_dot = x_dot + self.tau * xacc
-                theta = theta + self.tau * theta_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-            else:  # semi-implicit euler
-                x_dot = x_dot + self.tau * xacc
-                x = x + self.tau * x_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-                theta = theta + self.tau * theta_dot
-
-            self.state = (x, x_dot, theta, theta_dot)
-
-
-            done = bool(
-                x < -self.x_threshold
-                or x > self.x_threshold
-                or (
-                    not self.unrestricted_mode and (
-                        theta < -self.theta_threshold_radians
-                        or theta > self.theta_threshold_radians
-                    )
+        if not done:
+            reward = 1.0
+        elif self.steps_beyond_done is None:
+            # Pole just fell!
+            self.steps_beyond_done = 0
+            reward = 1.0
+        else:
+            if self.steps_beyond_done == 0:
+                logger.warn(
+                    "You are calling 'step()' even though this "
+                    "environment has already returned done = True. You "
+                    "should always call 'reset()' once you receive 'done = "
+                    "True' -- any further steps are undefined behavior."
                 )
-            )
-
-            if not done:
-                
-                if (self.unrestricted_mode and (theta < -self.theta_threshold_radians or theta > self.theta_threshold_radians)):
-                    reward += 0.0
-                else:
-                    reward += 1.0
-            
-            elif self.steps_beyond_done is None:
-                # Pole just fell!
-                self.steps_beyond_done = 0
-                reward = self.end_reward
-            else:
-                if self.steps_beyond_done == 0:
-                    logger.warn(
-                        "You are calling 'step()' even though this "
-                        "environment has already returned done = True. You "
-                        "should always call 'reset()' once you receive 'done = "
-                        "True' -- any further steps are undefined behavior."
-                    )
-                self.steps_beyond_done += 1
-                reward += 0.0
-                
-            sim_steps -= 1
-            
-            if self.weak:
-                action = -1
-                
-        # self.reward_history.append(reward)
-        return np.array(self.state, dtype=np.float32), reward, done, {}
+            self.steps_beyond_done += 1
+            reward = 0.0
+        # print(self.state)
+        return np.array(self.state), reward, done, {}
 
     def reset(self):
-        self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
+        self.state = np.array([5000, 0, 0, 0])
         self.steps_beyond_done = None
-        return np.array(self.state, dtype=np.float32)
+        return np.array(self.state)
 
-    def render(self, mode="human"):
+    def render(self, mode='human'):
         screen_width = 600
         screen_height = 400
 
         world_width = self.x_threshold * 2
-        
-        screen_width = int((600/(2.4*2))*world_width)
-        
-        scale = screen_width / world_width
+        scale = screen_width/world_width
         carty = 100  # TOP OF CART
         polewidth = 10.0
         polelen = scale * (2 * self.length)
@@ -228,32 +195,25 @@ class CartPoleEnv(gym.Env):
         cartheight = 30.0
 
         if self.viewer is None:
+            from gym.envs.classic_control import rendering
             self.viewer = rendering.Viewer(screen_width, screen_height)
-            # Cart
             l, r, t, b = -cartwidth / 2, cartwidth / 2, cartheight / 2, -cartheight / 2
             axleoffset = cartheight / 4.0
             cart = rendering.FilledPolygon([(l, b), (l, t), (r, t), (r, b)])
             self.carttrans = rendering.Transform()
             cart.add_attr(self.carttrans)
             self.viewer.add_geom(cart)
-            
-            # Pole
-            l, r, t, b = (
-                -polewidth / 2,
-                polewidth / 2,
-                polelen - polewidth / 2,
-                -polewidth / 2,
-            )
+            l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
             pole = rendering.FilledPolygon([(l, b), (l, t), (r, t), (r, b)])
-            pole.set_color(0, 1, 0.4)
+            pole.set_color(.8, .6, .4)
             self.poletrans = rendering.Transform(translation=(0, axleoffset))
             pole.add_attr(self.poletrans)
             pole.add_attr(self.carttrans)
             self.viewer.add_geom(pole)
-            self.axle = rendering.make_circle(polewidth / 2)
+            self.axle = rendering.make_circle(polewidth/2)
             self.axle.add_attr(self.poletrans)
             self.axle.add_attr(self.carttrans)
-            self.axle.set_color(0.5, 0.5, 0.8)
+            self.axle.set_color(.5, .5, .8)
             self.viewer.add_geom(self.axle)
             self.track = rendering.Line((0, carty), (screen_width, carty))
             self.track.set_color(0, 0, 0)
@@ -266,12 +226,7 @@ class CartPoleEnv(gym.Env):
 
         # Edit the pole polygon vertex
         pole = self._pole_geom
-        l, r, t, b = (
-            -polewidth / 2,
-            polewidth / 2,
-            polelen - polewidth / 2,
-            -polewidth / 2,
-        )
+        l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
         pole.v = [(l, b), (l, t), (r, t), (r, b)]
 
         x = self.state
@@ -279,7 +234,7 @@ class CartPoleEnv(gym.Env):
         self.carttrans.set_translation(cartx, carty)
         self.poletrans.set_rotation(-x[2])
 
-        return self.viewer.render(return_rgb_array=mode == "rgb_array")
+        return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
     def close(self):
         if self.viewer:
