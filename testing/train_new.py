@@ -1,4 +1,4 @@
-from simulation import CartPoleEnv
+from simulation2 import CartPoleEnv
 # import gym.envs.classic_control.cartpole
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -14,10 +14,10 @@ def Qtable(state_space,action_space,bin_size = 30):
     """
     Initialises q-table, with given bin size.
     """
-    bins = [np.linspace(0,10000,bin_size),
-            np.linspace(-1000, 1000 ,bin_size),
-            np.linspace(-2.4, 2.4, bin_size),
-            np.linspace(-100, 100, bin_size)]
+    bins = [np.linspace(-4.8,4.8,bin_size),
+            np.linspace(-4,4,bin_size),
+            np.linspace(-0.418,0.418,bin_size),
+            np.linspace(-4,4,bin_size)]
             
     
     # q_table = np.reshape(np.loadtxt('testing/q_table_init.txt'), ([bin_size] * state_space + [action_space]))
@@ -65,7 +65,7 @@ def Q_learning(q_table, bins, episodes = 5000, gamma = 0.95, lr = 0.1, timestep 
             ep_start = time.time()
 
             if render:
-                if episode%(10*timestep) == 0:
+                if episode%(timestep) == 0:
                     env.render()
             
             # epsilon greedy action
@@ -127,7 +127,7 @@ def Q_learning(q_table, bins, episodes = 5000, gamma = 0.95, lr = 0.1, timestep 
 q_table, bins = Qtable(len(env.observation_space.low), env.action_space.n)
 q_table_init = q_table.copy()
 # 
-Q_learning(q_table, bins, lr = 0.15, gamma = 0.995, episodes = 100, timestep = 500)
+Q_learning(q_table, bins, lr = 0.15, gamma = 0.995, episodes = 1000, timestep = 5)
 
 
 
