@@ -1,3 +1,4 @@
+from time import sleep
 from gym.envs.classic_control import rendering
 import math
 from scipy.integrate import odeint
@@ -7,24 +8,6 @@ import matplotlib.pyplot as plt
 masspole = 100 #kg
 length = 1 #m
 gravity = 9.8 #ms^-2
-
-def cart_dydt(y, t, xacc, masspole, length, gravity):
-    xacc = xacc
-    theta, theta_dot = y
-
-    # For the interested reader:
-    # https://coneural.org/florian/papers/05_cart_pole.pdf
-    # Eq (14):*******minus sign
-    # Theta zero at top and +ve going clockwise from vertical
-    thetaacc = 3.0 / (4.0 * masspole * length**2) * (
-        masspole*length * (gravity*math.sin(theta) - xacc*math.cos(theta)) 
-    )
-    dydt = [theta_dot, thetaacc]
-
-    # theta, omega = y
-
-    # dydt = [omega, -0.5*np.sin(theta)]
-    return dydt
 
 class Cart:
     """
@@ -38,38 +21,59 @@ class Cart:
         self.state = [0, 0, np.pi, 0.0]
         self.time = 0
 
-        self.RAIL_LENGTH = 200 # steps, lets assume for now this is 1m
-        self.STEP_LENGTH = 1/10000 # metres/step (one step in metric metres) 
-
-        self.world_width = self.RAIL_LENGTH *2# self.STEP_LENGTH *2 # i.e. currently 2m
-
-
         self.viewer = None
-        self.screen_width = 600
-        self.screen_height = 400
-        self.scale = self.screen_width/self.world_width # pixels/metre
+        self.RAIL_STEP_LENGTH = 10000 # steps, lets assume for now this is 1m
+        self.RAIL_M_LENGTH = 1 # metres
+        self.STEP_LENGTH = self.RAIL_M_LENGTH/self.RAIL_STEP_LENGTH # metres/step 
+        self.WORLD_WIDTH = self.RAIL_M_LENGTH *5# self.STEP_LENGTH *2 # i.e. currently 2m
 
-    def step(self, xacc):
-        self.time += self.dt
+    @staticmethod
+    def pole_dynamics(y, t, x_ddot, masspole, length, gravity):
+        """
+        Equations of motion for cart
+        """
+        theta, theta_dot = y
+
+        # For the interested reader:
+        # https://coneural.org/florian/papers/05_cart_pole.pdf
+        # Eq (14):*******minus sign
+        # Theta zero at top and +ve going clockwise from vertical
+        thetaacc = 3.0 / (4.0 * masspole * length**2) * (
+            masspole*length * (gravity*math.sin(theta) - x_ddot*math.cos(theta)) 
+        )
+        dydt = [theta_dot, thetaacc]
+        return dydt
+
+    def cart_dynamics(self, xacc) -> tuple:
         x_dot = self.state[1] + self.dt * xacc
         x = self.state[0] + x_dot * self.dt
 
+        return (x, x_dot)
+
+    def step(self, xacc):
+        self.time += self.dt
+        x, x_dot = self.cart_dynamics(xacc)
         time_arr = np.linspace(self.time-self.dt, self.time, 100001)
-        sol = odeint(cart_dydt, self.state[2:], time_arr, args=(xacc,masspole,length,gravity))
+        sol = odeint(self.pole_dynamics, self.state[2:], time_arr, args=(xacc,masspole,length,gravity))
 
         self.state = (x, x_dot, sol[-1, 0], sol[-1, 1])
         print(f"Time: {self.time}")
-        # plt.plot(time_arr, sol[:, 0], 'b', label='theta(t)')
+        print(self.state)
+        # sleep(0.05)
         self.render()
-        # plt.show()
 
     def render(self, mode='human'):
 
-        carty = 100  # TOP OF CART
-        polewidth = 10.0
-        polelen = length*self.scale
-        cartwidth = 50.0
-        cartheight = 30.0
+        self.screen_width = 600
+        self.screen_height = 600
+
+        self.SCALE = self.screen_width/self.WORLD_WIDTH # pixels/2 metre
+
+        carty = self.screen_height/2  # TOP OF CART
+        polewidth = 0.02*self.SCALE
+        polelen = length*self.SCALE
+        cartwidth = 0.1*self.SCALE
+        cartheight = 0.06*self.SCALE
 
         if self.viewer is None:
 
@@ -97,11 +101,11 @@ class Cart:
             self.viewer.add_geom(self.track)
 
 
-            self.limit_right = rendering.Line((self.RAIL_LENGTH * self.scale/2 +self.screen_width / 2, -carty), 
-                                            (self.RAIL_LENGTH * self.scale+ self.screen_width / 4.0, 2*carty))
+            self.limit_right = rendering.Line((self.RAIL_M_LENGTH * self.SCALE/2 + self.screen_width /2, carty/2), 
+                                              (self.RAIL_M_LENGTH * self.SCALE/2 + self.screen_width /2, carty+carty/2))
             self.viewer.add_geom(self.limit_right)
-            self.limit_left = rendering.Line((self.screen_width / 4.0, -carty), 
-                                            (self.screen_width / 4.0, 2*carty))
+            self.limit_left = rendering.Line((-self.RAIL_M_LENGTH * self.SCALE/2 + self.screen_width /2, carty/2), 
+                                             (-self.RAIL_M_LENGTH * self.SCALE/2 + self.screen_width /2, carty+carty/2))
             self.viewer.add_geom(self.limit_left)
 
             self._pole_geom = pole
@@ -115,7 +119,7 @@ class Cart:
         pole.v = [(l, b), (l, t), (r, t), (r, b)]
 
         x = self.state
-        cartx = x[0] * self.scale + self.screen_width / 2.0  # MIDDLE OF CART
+        cartx = x[0] * self.SCALE + self.screen_width / 2.0  # MIDDLE OF CART
         self.carttrans.set_translation(cartx, carty)
         self.poletrans.set_rotation(-x[2])
 
@@ -123,7 +127,16 @@ class Cart:
 
 test_cart = Cart()
 
-for _ in range(300):
-    test_cart.step(1)
-for _ in range(600):
-    test_cart.step(-1)
+# for _ in range(10):
+#     test_cart.step(1)
+
+# for _ in range(25):
+#     test_cart.step(-1)
+
+# for _ in range(40):
+#     test_cart.step(1)
+
+# for _ in range(20):
+#     test_cart.step(-1)
+for _ in range(1000):
+    test_cart.step(0.01)
