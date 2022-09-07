@@ -1,5 +1,6 @@
 from stable_baselines3 import PPO, DQN
 from simulation1 import CartPoleEnv
+# from gym.envs.classic_control.cartpole import CartPoleEnv
 
 from stable_baselines3.common.env_checker import check_env
 
@@ -20,7 +21,7 @@ model = PPO("MlpPolicy", env, verbose=1)
 # train_freq=10, gradient_steps=1, optimize_memory_usage=False, 
 # target_update_interval=10000, exploration_fraction=0.5, 
 # exploration_initial_eps=1, exploration_final_eps=0.15, verbose=1)
-model.learn(total_timesteps=30000)
+model.learn(total_timesteps=100000)
 
 obs = env.reset()
 for _ in range(10000):

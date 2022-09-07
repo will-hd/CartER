@@ -74,13 +74,13 @@ class CartPoleEnv(gym.Env):
         # physical constants
         self.gravity = 9.8 # a classic ...
         self.masspole = 10
-        self.length = 1# actually half the pole's length
+        self.length = 3# actually half the pole's length
 
-        self._DELTA_X_DOT_STEPS = 1000 # agents increment in speed at each action
+        self._DELTA_X_DOT_STEPS = 2000 # agents increment in speed at each action
 
         self.WORLD_TIME = 0
-        self.dt = 0.01 # seconds between step updates
-        self.tau = 0.0002  # seconds at which to iterate the ODE solving algorithm
+        self.dt = 0.02 # seconds between step updates
+        self.tau = 0.0001  # seconds at which to iterate the ODE solving algorithm
 
         self.track_length = 10000 # steps (of stepper motor)
 
@@ -105,14 +105,14 @@ class CartPoleEnv(gym.Env):
         
         low = np.array([0,
                         -np.finfo(np.float32).max,
-                        self.THETA_FAIL_THRESHOLD_RADIANS * 2,
+                        -self.THETA_FAIL_THRESHOLD_RADIANS * 2,
                         -np.finfo(np.float32).max],
                         dtype=np.float32)
-        
+        print(low, high)
         self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
-        self.MAX_STEPS = 4000
+        self.MAX_STEPS = 10000
         self.step_count = 0 #
 
         self.seed()
@@ -133,6 +133,7 @@ class CartPoleEnv(gym.Env):
         theta, theta_dot = y
 
         x_ddot_in_meters = x_ddot * STEP_LENGTH
+        # print(x_ddot_in_meters)
         # For the interested reader:
         # https://coneural.org/florian/papers/05_cart_pole.pdf
         # Eq (14):*******minus sign
@@ -168,7 +169,7 @@ class CartPoleEnv(gym.Env):
         x_dot_steps = x_dot_steps + _direction * self._DELTA_X_DOT_STEPS #steps s-1
         x_steps = x_steps + self.dt * x_dot_steps #steps
 
-        time_points = np.linspace(previous_world_time, self.WORLD_TIME, 10001) # array of time steps for ODE alg
+        time_points = np.linspace(previous_world_time, self.WORLD_TIME, 1001) # array of time steps for ODE alg
         new_angles = odeint(self.pole_dynamics, (theta, theta_dot), time_points, 
                         args=(x_ddot, self.masspole, self.length, self.gravity, self.STEP_LENGTH))
 
@@ -187,6 +188,7 @@ class CartPoleEnv(gym.Env):
             or self.step_count > self.MAX_STEPS
         )
         
+        print(self.state)
         if not done:
             reward = 1.0
         elif self.steps_beyond_done is None:
