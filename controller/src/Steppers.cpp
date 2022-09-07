@@ -9,7 +9,7 @@
 
 /*
  ! Stepper information:
- * Step angle: 1.8 deg (= 200 steps per rotation)
+ * Step angle: 1.8 deg (= 200 steps per rotation) (NOTE any microsteps)
  * Max current: 1.33 A
  * Voltage rating: 2.8 V
  *
