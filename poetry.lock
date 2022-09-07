@@ -62,17 +62,6 @@ python-versions = "*"
 pycparser = "*"
 
 [[package]]
-name = "click"
-version = "8.1.3"
-description = "Composable command line interface toolkit"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[package.dependencies]
-colorama = {version = "*", markers = "platform_system == \"Windows\""}
-
-[[package]]
 name = "cloudpickle"
 version = "2.1.0"
 description = "Extended pickling support for Python objects"
@@ -84,7 +73,7 @@ python-versions = ">=3.6"
 name = "colorama"
 version = "0.4.5"
 description = "Cross-platform colored terminal text."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
@@ -370,7 +359,6 @@ numpy = [
     {version = ">=1.18.5", markers = "platform_machine != \"aarch64\" and platform_machine != \"arm64\" and python_version < \"3.10\""},
     {version = ">=1.19.2", markers = "platform_machine == \"aarch64\" and python_version < \"3.10\""},
     {version = ">=1.20.0", markers = "platform_machine == \"arm64\" and python_version < \"3.10\""},
-    {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
 ]
 python-dateutil = ">=2.8.1"
 pytz = ">=2020.1"
@@ -488,6 +476,14 @@ description = "C parser in Python"
 category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[[package]]
+name = "pyglet"
+version = "1.5.26"
+description = "Cross-platform windowing and multimedia library"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "pygments"
@@ -709,8 +705,8 @@ python-versions = "*"
 
 [metadata]
 lock-version = "1.1"
-python-versions = ">3.9.10"
-content-hash = "9386b7730f4582d6b38ded03d39624ae41e22848f28ea429139253128751d38d"
+python-versions = "3.9.10"
+content-hash = "3085013ec5665fb281c145349ceb898e670bce772b7f23020274a85d516cc10d"
 
 [metadata.files]
 appnope = []
@@ -719,7 +715,6 @@ atomicwrites = []
 attrs = []
 backcall = []
 cffi = []
-click = []
 cloudpickle = []
 colorama = []
 cycler = []
@@ -753,6 +748,7 @@ ptyprocess = []
 pure-eval = []
 py = []
 pycparser = []
+pyglet = []
 pygments = []
 pyparsing = []
 pyserial = []
