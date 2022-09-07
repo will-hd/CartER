@@ -10,55 +10,59 @@ import math
 import gym
 from gym import spaces, logger
 from gym.utils import seeding
+from matplotlib import test
 import numpy as np
 
 from scipy.integrate import odeint
+from torch import positive
 
 class CartPoleEnv(gym.Env):
     """
-    Description:
-        A pole is attached by an un-actuated joint to a cart, which moves along
-        a frictionless track. The pendulum starts upright, and the goal is to
-        prevent it from falling over by increasing and reducing the cart's
-        velocity.
+    DERIVED FROM GYM CARTPOLEENV.
 
-    Source:
-        This environment corresponds to the version of the cart-pole problem
-        described by Barto, Sutton, and Anderson
+    # Description:
+    #     A pole is attached by an un-actuated joint to a cart, which moves along
+    #     a frictionless track. The pendulum starts upright, and the goal is to
+    #     prevent it from falling over by increasing and reducing the cart's
+    #     velocity.
 
-    Observation:
-        Type: Box(4)
-        Num     Observation               Min                     Max
-        0       Cart Position             -4.8                    4.8
-        1       Cart Velocity             -Inf                    Inf
-        2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
-        3       Pole Angular Velocity     -Inf                    Inf
+    # Source:
+    #     This environment corresponds to the version of the cart-pole problem
+    #     described by Barto, Sutton, and Anderson
 
-    Actions:
-        Type: Discrete(2)
-        Num   Action
-        0     Push cart to the left
-        1     Push cart to the right
+    # Observation:
+    #     Type: Box(4)
+    #     Num     Observation               Min                     Max
+    #     0       Cart Position             -4.8                    4.8
+    #     1       Cart Velocity             -Inf                    Inf
+    #     2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
+    #     3       Pole Angular Velocity     -Inf                    Inf
 
-        Note: The amount the velocity that is reduced or increased is not
-        fixed; it depends on the angle the pole is pointing. This is because
-        the center of gravity of the pole increases the amount of energy needed
-        to move the cart underneath it
+    # Actions:
+    #     Type: Discrete(2)
+    #     Num   Action
+    #     0     Push cart to the left
+    #     1     Push cart to the right
 
-    Reward:
-        Reward is 1 for every step taken, including the termination step
+    #     Note: The amount the velocity that is reduced or increased is not
+    #     fixed; it depends on the angle the pole is pointing. This is because
+    #     the center of gravity of the pole increases the amount of energy needed
+    #     to move the cart underneath it
 
-    Starting State:
-        All observations are assigned a uniform random value in [-0.05..0.05]
+    # Reward:
+    #     Reward is 1 for every step taken, including the termination step
 
-    Episode Termination:
-        Pole Angle is more than 12 degrees.
-        Cart Position is more than 2.4 (center of the cart reaches the edge of
-        the display).
-        Episode length is greater than 200.
-        Solved Requirements:
-        Considered solved when the average return is greater than or equal to
-        195.0 over 100 consecutive trials.
+    # Starting State:
+    #     All observations are assigned a uniform random value in [-0.05..0.05]
+
+    # Episode Termination:
+    #     Pole Angle is more than 12 degrees.
+    #     Cart Position is more than 2.4 (center of the cart reaches the edge of
+    #     the display).
+    #     Episode length is greater than 200.
+    #     Solved Requirements:
+    #     Considered solved when the average return is greater than or equal to
+    #     195.0 over 100 consecutive trials.
     """
 
     metadata = {
@@ -67,47 +71,41 @@ class CartPoleEnv(gym.Env):
     }
 
     def __init__(self):
-        self.gravity = 9.8
-        self.masscart = 1.0
-        self.masspole = 100
-        self.total_mass = (self.masspole + self.masscart)
-        self.length = 0.5  # actually half the pole's length
-        self.polemass_length = (self.masspole * self.length)
+        # physical constants
+        self.gravity = 9.8 # a classic ...
+        self.masspole = 10
+        self.length = 1# actually half the pole's length
 
-        self._DELTA_X_DOT_STEPS = 100 # increment in velocity at each action
+        self._DELTA_X_DOT_STEPS = 1000 # agents increment in speed at each action
 
         self.WORLD_TIME = 0
-        self.dt = 0.1 # seconds between updates
-        self.tau = 0.0002  # seconds at which to perform ODE solving algorithm
-        self.kinematics_integrator = 'euler'
+        self.dt = 0.01 # seconds between step updates
+        self.tau = 0.0002  # seconds at which to iterate the ODE solving algorithm
 
-        self.track_length = 10000
-        # self.x_dot = 0 
-        # self.x = self.track_length / 2 # sjtart at centre
+        self.track_length = 10000 # steps (of stepper motor)
 
-        self.speed_increment = 500
-        self.rot_friction = 1
+        self.rot_friction = 1 # currently unused
 
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 12 * 2 * math.pi / 360
+        self.THETA_FAIL_THRESHOLD_RADIANS = 12 * (2 * math.pi / 360) # 12 degrees
 
         # Characteristics of the RAIL:
         self.RAIL_STEP_LENGTH = 10000 #steps (of stepper for entire rail)
-        self.RAIL_M_LENGTH = 1 #metre
-        self.STEP_LENGTH = self.RAIL_M_LENGTH/self.RAIL_STEP_LENGTH #metres/step, for conversion to SI
+        self.RAIL_M_LENGTH = 1 #meter
+        self.STEP_LENGTH = self.RAIL_M_LENGTH/self.RAIL_STEP_LENGTH #meters/step, for conversion to SI
 
 
-        # Angle limit set to 2 * theta_threshold_radians so failing observation
+        # Angle limit set to 2 * THETA_FAIL_THRESHOLD_RADIANS so failing observation
         # is still within bounds.
         high = np.array([self.RAIL_STEP_LENGTH * 2,
-                         np.finfo(np.float32).max,
-                         self.theta_threshold_radians * 2,
-                         np.finfo(np.float32).max],
+                        np.finfo(np.float32).max,
+                        self.THETA_FAIL_THRESHOLD_RADIANS * 2,
+                        np.finfo(np.float32).max],
                         dtype=np.float32)
         
         low = np.array([0,
                         -np.finfo(np.float32).max,
-                        -self.theta_threshold_radians * 2,
+                        self.THETA_FAIL_THRESHOLD_RADIANS * 2,
                         -np.finfo(np.float32).max],
                         dtype=np.float32)
         
@@ -123,8 +121,6 @@ class CartPoleEnv(gym.Env):
 
         self.steps_beyond_done = None
 
-        self.state = [0,0,np.pi,0]
-
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -136,29 +132,31 @@ class CartPoleEnv(gym.Env):
         """
         theta, theta_dot = y
 
-        x_ddot_in_metres = x_ddot * STEP_LENGTH
+        x_ddot_in_meters = x_ddot * STEP_LENGTH
         # For the interested reader:
         # https://coneural.org/florian/papers/05_cart_pole.pdf
         # Eq (14):*******minus sign
         # Theta zero at top and +ve going clockwise from vertical
         thetaacc = 3.0 / (4.0 * MASSPOLE * LENGTH**2) * (
-            MASSPOLE*LENGTH * (GRAVITY*math.sin(theta) - x_ddot_in_metres*math.cos(theta)) 
+            MASSPOLE*LENGTH * (GRAVITY*math.sin(theta) - x_ddot_in_meters*math.cos(theta)) 
         )
         dydt = [theta_dot, thetaacc]
         return dydt
 
     def step(self, action):
         """
-        x, x_dot, x_ddot in steps s-1 s-2, it is the job of pole_dynamics() to convert to relevant
-        units for accurate dynamics...
+        Computes a step of the environment, given the action from an agent.
+
+        x, x_dot, x_ddot are all in units of in steps (s-1 s-2), it is the job of pole_dynamics() to convert to relevant
+        units (meters s-1 s-2) for accurate dynamics...
         """
         err_msg = "%r (%s) invalid" % (action, type(action))
         assert self.action_space.contains(action), err_msg
 
-        _direction = 1 if action == 1 else -1 # left: action == 0, right: action == 1
+        _direction = 1 if action == 1 else -1 # left if action == 0, right if action == 1
 
         self.step_count += 1
-        previous_world_time = self.WORLD_TIME # for creating array of time steps
+        previous_world_time = self.WORLD_TIME # used for creating array of time steps
         self.WORLD_TIME += self.dt
 
         x_ddot = _direction * self._DELTA_X_DOT_STEPS / self.dt #acceleration (in steps s-2)
@@ -169,22 +167,23 @@ class CartPoleEnv(gym.Env):
         # Calculate next state
         x_dot_steps = x_dot_steps + _direction * self._DELTA_X_DOT_STEPS #steps s-1
         x_steps = x_steps + self.dt * x_dot_steps #steps
-        
 
-        time_steps = np.linspace(previous_world_time, self.WORLD_TIME, 10001)
-        new_angles = odeint(self.pole_dynamics, (theta, theta_dot), time_steps, 
+        time_points = np.linspace(previous_world_time, self.WORLD_TIME, 10001) # array of time steps for ODE alg
+        new_angles = odeint(self.pole_dynamics, (theta, theta_dot), time_points, 
                         args=(x_ddot, self.masspole, self.length, self.gravity, self.STEP_LENGTH))
 
+        # positive_angle = (2*np.pi + new_angles[-1, 0])%(2*np.pi)
         self.state = (round(x_steps, 0), x_dot_steps, new_angles[-1, 0], new_angles[-1, 1])
         
-        print(f"Time: {self.WORLD_TIME}")
-        print(self.state)
+        # print(f"Time: {self.WORLD_TIME}")
+        # print(self.state)
 
+        # Check if any failure conditions met
         done = bool(
             x_steps < 0
             or x_steps > self.RAIL_STEP_LENGTH
-            # or theta < -self.theta_threshold_radians
-            # or theta > self.theta_threshold_radians
+            or theta < -self.THETA_FAIL_THRESHOLD_RADIANS
+            or theta > self.THETA_FAIL_THRESHOLD_RADIANS
             or self.step_count > self.MAX_STEPS
         )
         
@@ -205,11 +204,11 @@ class CartPoleEnv(gym.Env):
             self.steps_beyond_done += 1
             reward = 0.0
         
-        sleep(0.05)
+        # sleep(0.05)
         return np.array(self.state), reward, done, {}
 
     def reset(self):
-        self.state = np.array([5000, 0, 0, -0.1])
+        self.state = [self.RAIL_STEP_LENGTH/2, 0, 0, 0] # starts in centre of rail with pole down
         self.steps_beyond_done = None
         self.step_count = 0
         self.WORLD_TIME = 0
@@ -253,12 +252,12 @@ class CartPoleEnv(gym.Env):
             self.track.set_color(0, 0, 0)
             self.viewer.add_geom(self.track)
 
-            self.limit_right = rendering.Line((self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty/2), 
+            self.limit_line_right = rendering.Line((self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty/2), 
                                               (self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty+carty/2))
-            self.viewer.add_geom(self.limit_right)
-            self.limit_left = rendering.Line((-self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty/2), 
+            self.viewer.add_geom(self.limit_line_right)
+            self.limit_line_left = rendering.Line((-self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty/2), 
                                              (-self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2, carty+carty/2))
-            self.viewer.add_geom(self.limit_left)
+            self.viewer.add_geom(self.limit_line_left)
 
             self._pole_geom = pole
 
@@ -270,10 +269,10 @@ class CartPoleEnv(gym.Env):
         l, r, t, b = -polewidth / 2, polewidth / 2, polelen - polewidth / 2, -polewidth / 2
         pole.v = [(l, b), (l, t), (r, t), (r, b)]
 
-        x_metres = self.state[0] * self.STEP_LENGTH
-        print(f"x in metres: {x_metres}")
+        x_meters = self.state[0] * self.STEP_LENGTH
+        # print(f"x in meters: {x_meters}, x in steps {self.state[0]}")
         angle = self.state[2]
-        cartx = x_metres * self.SCALE + screen_width / 2.0  # MIDDLE OF CART
+        cartx = x_meters * self.SCALE + (-self.RAIL_M_LENGTH * self.SCALE/2 + screen_width /2) # MIDDLE OF CART
         self.carttrans.set_translation(cartx, carty)
         self.poletrans.set_rotation(-angle)
 
@@ -285,12 +284,19 @@ class CartPoleEnv(gym.Env):
             self.viewer = None
 
 
-test_cart = CartPoleEnv()
+# test_cart = CartPoleEnv()
+# test_cart.reset()
 
-for _ in range(10):
-    test_cart.step(1)
-    test_cart.render()
+# for _ in range(8):
+#     test_cart.step(1)
+#     print(test_cart.state)
+#     test_cart.render()
 
-for _ in range(25):
-    test_cart.step(0)
-    test_cart.render()
+# for _ in range(50):
+#     test_cart.step(0)
+#     print(test_cart.state)
+#     test_cart.render()
+
+# for _ in range(25):
+#     test_cart.step(0)
+#     test_cart.render()

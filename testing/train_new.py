@@ -1,4 +1,4 @@
-from simulation2 import CartPoleEnv
+from simulation1 import CartPoleEnv
 # import gym.envs.classic_control.cartpole
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -10,14 +10,14 @@ obs = env.reset()
 
 print(env.observation_space.low,"\n",env.observation_space.high)
 
-def Qtable(state_space,action_space,bin_size = 30):
+def Qtable(state_space,action_space,bin_size = 20):
     """
     Initialises q-table, with given bin size.
     """
-    bins = [np.linspace(-4.8,4.8,bin_size),
-            np.linspace(-4,4,bin_size),
-            np.linspace(-0.418,0.418,bin_size),
-            np.linspace(-4,4,bin_size)]
+    bins = [np.linspace(0,10000,bin_size), # x
+            np.linspace(-20000,20000,bin_size), # x_dot
+            np.linspace(-0.418,0.418,bin_size), # theta
+            np.linspace(-2,2,bin_size)] # theta_dot
             
     
     # q_table = np.reshape(np.loadtxt('testing/q_table_init.txt'), ([bin_size] * state_space + [action_space]))
@@ -40,7 +40,7 @@ def Discrete(state, bins):
         index.append(np.digitize(state[i],bins[i]) - 1)
     return tuple(index)
 
-render = True
+render = False
 
 def Q_learning(q_table, bins, episodes = 5000, gamma = 0.95, lr = 0.1, timestep = 5000, epsilon = 0.5):
     epsilon0 = epsilon
@@ -127,7 +127,7 @@ def Q_learning(q_table, bins, episodes = 5000, gamma = 0.95, lr = 0.1, timestep 
 q_table, bins = Qtable(len(env.observation_space.low), env.action_space.n)
 q_table_init = q_table.copy()
 # 
-Q_learning(q_table, bins, lr = 0.15, gamma = 0.995, episodes = 1000, timestep = 5)
+Q_learning(q_table, bins, lr = 0.15, gamma = 0.995, episodes = 10000, timestep = 500)
 
 
 

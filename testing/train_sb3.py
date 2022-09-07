@@ -1,5 +1,5 @@
 from stable_baselines3 import PPO, DQN
-from simulation_BOUNCE import CartPoleEnv
+from simulation1 import CartPoleEnv
 
 from stable_baselines3.common.env_checker import check_env
 
