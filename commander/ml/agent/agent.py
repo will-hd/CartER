@@ -232,7 +232,7 @@ class CartpoleAgent():
         self.action_freq_ticker.tick()
 
         # action of 1 is to RIGHT, action of 0 is to the LEFT
-        speed_increment = 800
+        speed_increment = 200
         speed_increment *= 1 if action == Action.RIGHT else -1
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
