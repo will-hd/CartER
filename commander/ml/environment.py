@@ -187,8 +187,10 @@ class ExperimentalCartpoleEnv(gym.Env):
 
                
         # Take observation of experiment state
-        observation = self._agent.observe()
-        print(observation)
+        # !!!! Currently observation does not include position
+        # See prior to commit: 4097f15bb7104e91b1d916f074235d3c1a7e8d0c
+        observation = self._agent.observe() 
+        print(f"Observation: {observation}")
 
         # print(self._agent.estimate_angular_velocity())
         # print(observation)
@@ -293,7 +295,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         # the observation space.
         low = np.array(
             [
-                # -1000, #self.goal_params["failure_position"][0] * 2,  # Position
+                -1000, #self.goal_params["failure_position"][0] * 2,  # Position
                 -np.finfo(np.float64).max,  # Velocity can be any float
                 0, # theta
                 -np.finfo(np.float64).max
@@ -302,7 +304,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         )
         high = np.array(
             [
-                # +27000, #self.goal_params["failure_position"][1] * 2,  # Position
+                +27000, #self.goal_params["failure_position"][1] * 2,  # Position
                 np.finfo(np.float64).max,  # Velocity can be any float
                 5000, # max only 4096
                 np.finfo(np.float64).max

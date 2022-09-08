@@ -109,7 +109,7 @@ class CartpoleAgent():
 
     def __init__(
         self: CartpoleAgentT,
-        max_steps: int = 3000,
+        max_steps: int = 10000, #3000
         settled_x_threshold: float = 5.0,
         settled_down_theta_threshold: float = 2.0,
         settled_up_theta_threshold: float = 2.0,
@@ -314,7 +314,7 @@ class CartpoleAgent():
         else:
             # TODO 2/5
             # Return state as np.array
-            return self._state[1:]
+            return self._state # or if no position wanted:: return self._state[1:]
 
     # def observe_as_dict(self) -> ExternalStateMap:
     #     """
