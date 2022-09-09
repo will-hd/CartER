@@ -12,6 +12,7 @@ from gym import spaces, logger
 from gym.utils import seeding
 from matplotlib import test
 import numpy as np
+import random
 
 from scipy.integrate import odeint
 from torch import positive
@@ -74,24 +75,22 @@ class CartPoleEnv(gym.Env):
         # physical constants
         self.gravity = 9.8 # a classic ...
         self.masspole = 10
-        self.length = 3# actually half the pole's length
+        self.length = 2# actually half the pole's length
 
-        self._DELTA_X_DOT_STEPS = 2000 # agents increment in speed at each action
+        self._DELTA_X_DOT_STEPS = 1000 # agents increment in speed at each action
 
         self.WORLD_TIME = 0
         self.dt = 0.02 # seconds between step updates
         self.tau = 0.0001  # seconds at which to iterate the ODE solving algorithm
 
-        self.track_length = 10000 # steps (of stepper motor)
-
         self.rot_friction = 1 # currently unused
 
         # Angle at which to fail the episode
-        self.THETA_FAIL_THRESHOLD_RADIANS = 12 * (2 * math.pi / 360) # 12 degrees
+        self.THETA_FAIL_THRESHOLD_RADIANS = 20 * (2 * math.pi / 360) # 12 degrees
 
         # Characteristics of the RAIL:
-        self.RAIL_STEP_LENGTH = 10000 #steps (of stepper for entire rail)
-        self.RAIL_M_LENGTH = 1 #meter
+        self.RAIL_STEP_LENGTH = 20000 #steps (of stepper for entire rail)
+        self.RAIL_M_LENGTH = 2 #meter
         self.STEP_LENGTH = self.RAIL_M_LENGTH/self.RAIL_STEP_LENGTH #meters/step, for conversion to SI
 
 
@@ -112,7 +111,7 @@ class CartPoleEnv(gym.Env):
         self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
-        self.MAX_STEPS = 10000
+        self.MAX_STEPS = 200
         self.step_count = 0 #
 
         self.seed()
@@ -177,7 +176,7 @@ class CartPoleEnv(gym.Env):
         self.state = (round(x_steps, 0), x_dot_steps, new_angles[-1, 0], new_angles[-1, 1])
         
         # print(f"Time: {self.WORLD_TIME}")
-        # print(self.state)
+        print(self.state)
 
         # Check if any failure conditions met
         done = bool(
@@ -187,14 +186,15 @@ class CartPoleEnv(gym.Env):
             or theta > self.THETA_FAIL_THRESHOLD_RADIANS
             or self.step_count > self.MAX_STEPS
         )
-        
-        print(self.state)
+    
+        # print(self.state)
         if not done:
             reward = 1.0
         elif self.steps_beyond_done is None:
             # Pole just fell!
             self.steps_beyond_done = 0
             reward = 1.0
+            print("DONE")
         else:
             if self.steps_beyond_done == 0:
                 logger.warn(
@@ -210,7 +210,8 @@ class CartPoleEnv(gym.Env):
         return np.array(self.state), reward, done, {}
 
     def reset(self):
-        self.state = [self.RAIL_STEP_LENGTH/2, 0, 0, 0] # starts in centre of rail with pole down
+        random_starting_angle = random.uniform(-0.15,0.15)
+        self.state = [self.RAIL_STEP_LENGTH/2, 0, random_starting_angle, 0] # starts in centre of rail with pole down
         self.steps_beyond_done = None
         self.step_count = 0
         self.WORLD_TIME = 0
