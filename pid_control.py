@@ -1,45 +1,39 @@
-import numpy as np
-import time
-import matplotlib.pyplot as plt
-import random
-
-import stable_baselines3
+"""
+Inspired by: https://ethanr2000.medium.com/using-pid-to-cheat-an-openai-challenge-f17745226449
+"""
 from commander.ml.environment import ExperimentalCartpoleEnv
 from commander.log import setup_logging
 
-setup_logging(debug=False, file=False)
+setup_logging(debug=True, file=False)
 env = ExperimentalCartpoleEnv()
 observation = env.reset()
 
 centre_position = observation[0]
-print(centre_position)
 
 # 235, 0, 17.5 works!!!
 
-Kp = 235 # 135
-Ki = 0.1 # 226.5 # 96.5
-Kd = 17.5 # 47.5
-K_position_p = 0#-3 #+0.0002
-K_position_i = 0#0.004 #0.02#+0.002
-K_position_d = 0# +0.002
+# PID constants
+K_angle_p = 235 # 135
+K_angle_i = 0.1 # 226.5 # 96.5
+K_angle_d = 47.5 # 47.5
+
+K_position_p = 0 #-3 #+0.0002
+K_position_i = 0 #0.004 #0.02#+0.002
+K_position_d = 0 # +0.002
 
 action = 0
-integral = 0
-integral2 = 0
+integral_angle = 0
+integral_position = 0
 
-ANGLE_OFFSET = 2050
-INIT_OFFSET = 2052 # roughly the offset that keeps cart central on track
-OFFSET_THRESHOLD = 5
-
-def adjust_angle_offset(position, ANGLE_OFFSET):
-    if position > 0:
-        if (ANGLE_OFFSET > INIT_OFFSET - OFFSET_THRESHOLD):
-            ANGLE_OFFSET -= 1
+# def adjust_angle_offset(position, velocity, ANGLE_OFFSET):
+#     if position > 0 and velocity > 2000:
+#         ANGLE_OFFSET = 2051
     
-    elif position < 0:
-        if ANGLE_OFFSET < INIT_OFFSET + OFFSET_THRESHOLD:
-            ANGLE_OFFSET += 1
-    return ANGLE_OFFSET
+#     elif position < 0 and velocity < -2000:
+#         ANGLE_OFFSET = 2052
+
+
+#     return ANGLE_OFFSET
 
 for _ in range(100000):
 #   env.render()
@@ -48,24 +42,22 @@ for _ in range(100000):
     print(observation)
     position = observation[0] - centre_position
     velocity = observation[1]
-    ANGLE_OFFSET = adjust_angle_offset(position, ANGLE_OFFSET)
-    print(f"OFFSET: {ANGLE_OFFSET}")
-    angle = observation[2] - ANGLE_OFFSET # offsets from 2048 help keep cart in the middle (wihtout knowledge of position)
+    angle = observation[2] - 2051.5 # 2051/2052offsets from ~2048 help keep cart in the middle (wihtout knowledge of position) 
+    # not exactly 2048 perhaps due to weights being offcentre
     angular_velocity = observation[3]
-    # print(f"State: {angle}, {angular_velocity}")
 
-    integral = integral + angle
-    integral2 = integral2 + position
+    integral_angle = integral_angle + angle
+    integral_position = integral_position + position
 
-    pid_angle = Kp*(angle) + Kd*(angular_velocity) + Ki*(integral)
-    pid_position = K_position_p*(position) + K_position_d*(velocity) + K_position_i*(integral2)
-    print(pid_angle)
-    print(pid_position)
+    pid_angle = K_angle_p*(angle) + K_angle_d*(angular_velocity) + K_angle_i*(integral_angle)
+    pid_position = K_position_p*(position) + K_position_d*(velocity) + K_position_i*(integral_position)
+
     F = pid_angle + pid_position
 
     action = 1 if F > 0 else 0
     print(f"action: {action}")
+
     if done:
         observation = env.reset()
-        integral = 0
-        integral2 = 0
+        integral_angle = 0
+        integral_position = 0

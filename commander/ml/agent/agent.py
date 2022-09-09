@@ -109,10 +109,10 @@ class CartpoleAgent():
 
     def __init__(
         self: CartpoleAgentT,
-        max_steps: int = 10000, #3000
+        max_steps: int = 100000, #3000
         settled_x_threshold: float = 5.0,
-        settled_down_theta_threshold: float = 2.0,
-        settled_up_theta_threshold: float = 2.0,
+        settled_down_theta_threshold: float = 8.0,
+        settled_up_theta_threshold: float = 4.0,
         observation_maximum_interval: int = 10 * 1000,  # us
         action_minimum_interval: float = 0.003,  # s
         action_maximum_interval: float = 0.010,
@@ -151,7 +151,7 @@ class CartpoleAgent():
         # Used for estimating angular velocity
         self.dTime = 1
 
-        self.failure_angle = [1796, 2300]
+        self.failure_angle = [1766, 2330]
 
         self.setup()
         self.update_goal(self.goal_params)
