@@ -76,7 +76,7 @@
 // float RealCustomAMS_5600::readAngleDeg()
 // {
 //     _select();
-//     float angleDeg = _rawAngleToDeg(getRawAngle());
+//     float angleDeg = _rawAngleToDeg(get_raw_angle());
 //     _unselect();
 
 //     return angleDeg;

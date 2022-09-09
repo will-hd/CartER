@@ -7,10 +7,13 @@
 const byte numChars = 5;
 char receivedChars[numChars];
 
-boolean newData = false;
 boolean requestedData = false;
 unsigned short angleOffset = 0;
 
+
+/**
+ * Flush the serial connected to the MEGA. 
+ */
 void serial1Flush(){
     // packet_sender.send_debug("Flush"); 
     while(Serial1.available() > 0) {
@@ -18,57 +21,15 @@ void serial1Flush(){
     }
 }
 
-void recvWithStartEndMarkers() {
+/**
+ * Recieve data from Arduino MEGA while blocking until all data recieved.
+ *
+ * Start, end markers are used though probably unnecessary.
+ * Ideally, I2C for rotary encoder would be from Arduino DUE and MEGA 
+ * would not be required....
+ */
+void recv_with_blocking(){
 
-    // Need a more robust way of getting velocity - so that reading is most current (i.e. empty buffer after each reading?)
-    static boolean recvInProgress = false;
-    static byte ndx = 0;
-
-    // Packet markers
-    char startMarker = '<';
-    char endMarker = '>';
-    
-    char rc; // Recieved bytes
-    while (Serial1.available() == 0);
-    // packet_sender.send_debug("Waiting");
-
-    while (Serial1.available() > 0 && newData == false) { //Serial1.available > 0, requestedData == true
-        // packet_sender.send_debug('"'+std::to_string(Serial1.available()));   
-        rc = Serial1.read();
-        // Serial.println(rc);
-
-        if (rc == startMarker) {
-            recvInProgress = true;
-            packet_sender.send_debug("now blocking");  
-        }
-
-        while (recvInProgress == true) {
-            // Serial.println("Ava");
-            
-            rc = Serial1.read();
-
-            if (rc != endMarker) {
-                // packet_sender.send_debug("rc:" +std::to_string(rc));    
-                receivedChars[ndx] = rc;
-                ndx++;
-                if (ndx >= numChars) {
-                    ndx = numChars - 1;
-                }
-            }
-            else if (rc == endMarker) {
-                receivedChars[ndx] = '\0'; // terminate the string
-                recvInProgress = false;
-                ndx = 0;
-                newData = true;
-                requestedData = false;
-            }
-        }
-    }
-}
-
-void recvWithBlocking(){
-    // static boolean recvInProgress = false;
-    // static byte ndx = 0;
 
     // Packet markers
     char startMarker = '<';
@@ -89,14 +50,20 @@ void recvWithBlocking(){
     }
 }
 
-
-void requestData(){
+/**
+ * Send "request data" byte to arduino MEGA.
+ */
+void request_data(){
     Serial1.write(0x3F);
     requestedData = true;
     // packet_sender.send_debug("req"); 
 }
 
-int getRawAngle(){
+
+/**
+ * Read the raw angle (0-4095) sent from MEGA.
+ */
+int get_raw_angle(){
     char highByte_show = receivedChars[0];
     char lowByte_show = receivedChars[1];
     unsigned short recombined_int = (highByte_show << 8) | lowByte_show;
@@ -104,7 +71,11 @@ int getRawAngle(){
     return recombined_int;
 }
 
-unsigned short getTaredAngle(){
+/**
+ * Get angle mod offset angle (due to veritcal not being zero on encoder).
+ * Aligning the magnets to zero would be impractical.
+ */
+unsigned short get_tared_angle(){
     char highByte_show = receivedChars[0];
     char lowByte_show = receivedChars[1];
     unsigned short recombined_int = (highByte_show << 8) | lowByte_show;
@@ -112,7 +83,12 @@ unsigned short getTaredAngle(){
 
     return shifted_angle;
 }
-unsigned short getTime() {
+
+/**
+ * Read time of angle measurements.
+ * Used for estimating angular velocity.
+ */
+unsigned short get_time() {
     char highByte_show = receivedChars[2];
     char lowByte_show = receivedChars[3];
     unsigned short recombined_int = (highByte_show << 8) | lowByte_show;
@@ -120,24 +96,16 @@ unsigned short getTime() {
     return recombined_int;
 }
 
-void showNewData() {
-    
-    if (newData == true) {
-        // Serial.println(receivedChars);
-        int angle = getTaredAngle();
-        // int shifted_angle = (360 + angleOffset - angle) % 360;
-        packet_sender.send_debug(std::to_string(angle));
-        newData = false;
-    }
-}
-
-void getInitAngle() {
+void get_init_angle() {
     // Request
-    requestData();
+    request_data();
         
     // Receive
-    recvWithBlocking();
-    angleOffset = getRawAngle();
+    recv_with_blocking();
+    // angleOffset = get_raw_angle();
+    // The angle given by rot enc when vertically down.
+    // Assumes that the magnet and rotary encoder will not shift relative to each other
+    angleOffset = 3598; 
 
-    packet_sender.send_debug("INIT ANGLE: "+std::to_string(angleOffset));
+    packet_sender.send_debug("INIT Angle (hardcoded - not detected): "+std::to_string(angleOffset));
 }

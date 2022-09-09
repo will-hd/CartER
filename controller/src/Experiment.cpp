@@ -26,7 +26,7 @@ void observation_tick()
 
     if (static_cast<uint32_t>(micros() - last_observation_us) >= OBSERVATION_INTERVAL_US)
     {
-        requestData();
+        request_data();
         // Update last observation
         last_observation_us = micros();
         send_observation(1);
@@ -57,10 +57,10 @@ void send_observation(uint8_t cart_id)
     uint32_t actions_done_counter = Actions_Done_Counter;
 
     std::unique_ptr<ObservationPacket> packet = std::make_unique<ObservationPacket>();
-    recvWithBlocking();
+    recv_with_blocking();
 
-    uint16_t angle_deg = getTaredAngle();
-    uint16_t dTime = getTime();
+    uint16_t angle_deg = get_tared_angle();
+    uint16_t dTime = get_time();
 
     packet->construct(timestamp_micros, cart_id, position_step, velocity_step, angle_deg, dTime, actions_done_counter);
 
