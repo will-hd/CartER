@@ -1,3 +1,8 @@
+/**
+ * @file arduinoMEGA_main.cpp
+ * Inspired by: https://forum.arduino.cc/t/serial-input-basics-updated/382007
+ */
+
 #include <Arduino.h>
 #include <RotEncoder.h>
 #include <Wire.h>
