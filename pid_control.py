@@ -3,8 +3,10 @@ Inspired by: https://ethanr2000.medium.com/using-pid-to-cheat-an-openai-challeng
 """
 from commander.ml.environment import ExperimentalCartpoleEnv
 from commander.log import setup_logging
+from commander.network.protocol import SetVelocityPacket
+from commander.network.network_constants import SetOperation
 
-setup_logging(debug=True, file=False)
+setup_logging(debug=False, file=False)
 env = ExperimentalCartpoleEnv()
 observation = env.reset()
 
@@ -17,9 +19,9 @@ K_angle_p = 235 # 135
 K_angle_i = 0.1 # 226.5 # 96.5
 K_angle_d = 47.5 # 47.5
 
-K_position_p = 0 #-3 #+0.0002
+K_position_p = 0.5 #-3 #+0.0002
 K_position_i = 0 #0.004 #0.02#+0.002
-K_position_d = 0 # +0.002
+K_position_d = 0.1 # +0.002
 
 action = 0
 integral_angle = 0
@@ -34,6 +36,30 @@ integral_position = 0
 
 
 #     return ANGLE_OFFSET
+
+def switch_action(action):
+    if action == 0:
+        return 1
+    elif action == 1:
+        return 0
+    else:
+        print("Invalid action")
+start = False
+
+while not start:
+    observation, reward, done, info = env.step(action)
+    action = switch_action(action)
+    print(observation)
+    position = observation[0] - centre_position
+    velocity = observation[1]
+    angle = observation[2] - 2051.5 # 2051/2052offsets from ~2048 help keep cart in the middle (wihtout knowledge of position) 
+    # not exactly 2048 perhaps due to weights being offcentre
+    angular_velocity = observation[3]
+
+    if abs(angular_velocity) < 60 and abs(angle) < 50:
+        start = True
+        break
+
 
 for _ in range(100000):
 #   env.render()
