@@ -23,7 +23,7 @@ class Q:
         Initialises q-table, with given bin size.
         """
         bins = [
-                # np.linspace(0,25000,bin_size), # x
+                # np.linspace(0,25000,bin_size), # x # Should change the agent.observe() to return without position (see git log history for commit)
                 np.linspace(-15000,15000,bin_size), # dx
                 np.linspace(1796,2300,bin_size), # theta [1796, 2300]
                 np.linspace(-270,270,bin_size) # dtheta
