@@ -11,7 +11,7 @@ setup_logging(debug=False, file=False)
 env = ExperimentalCartpoleEnv()
 
 
-# https://github.com/maciejbalawejder/ReinforcementLearning-collection/blob/main/Q-Table/Qtable.ipynb
+#See https://github.com/maciejbalawejder/ReinforcementLearning-collection/blob/main/Q-Table/Qtable.ipynb
 class Q:
 
     def __init__(self, env) -> None:
