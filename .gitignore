@@ -45,3 +45,11 @@ interesting_logs/
 
 # work-space files
 .code-workspace
+
+# MISC log files and tests
+results_history.txt
+swingup_test.py
+q_learning_results.txt
+q_learning_plot.py
+plot_results.txt
+nonevenly_spaced_bins.py
