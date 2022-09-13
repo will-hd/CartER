@@ -232,7 +232,7 @@ class CartpoleAgent():
         self.action_freq_ticker.tick()
 
         # action of 1 is to RIGHT, action of 0 is to the LEFT
-        speed_increment = 200
+        speed_increment = 300
         speed_increment *= 1 if action == Action.RIGHT else -1
 
         rand_numb = np.random.randint(0, 250) # 250 to allow values that will never be chosen in normal operation
@@ -295,8 +295,8 @@ class CartpoleAgent():
         checks = {
             FailureDescriptors.POSITION_LEFT: False,
             FailureDescriptors.POSITION_RIGHT: False,
-            FailureDescriptors.ANGLE_LEFT: theta < self.failure_angle[0],
-            FailureDescriptors.ANGLE_RIGHT: theta > self.failure_angle[1]
+            # FailureDescriptors.ANGLE_LEFT: theta < self.failure_angle[0],
+            # FailureDescriptors.ANGLE_RIGHT: theta > self.failure_angle[1]
         }
 
         checks[FailureDescriptors.MAX_STEPS_REACHED] = self.steps >= self.max_steps

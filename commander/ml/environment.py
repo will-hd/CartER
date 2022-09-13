@@ -190,7 +190,7 @@ class ExperimentalCartpoleEnv(gym.Env):
         # !!!! Currently observation does not include position
         # See prior to commit: 4097f15bb7104e91b1d916f074235d3c1a7e8d0c
         observation = self._agent.observe() 
-        print(f"Observation: {observation}")
+        # print(f"Observation: {observation}")
 
         # print(self._agent.estimate_angular_velocity())
         # print(observation)
@@ -215,7 +215,7 @@ class ExperimentalCartpoleEnv(gym.Env):
 
         checks = self._agent.check_state(observation)
 
-        if checks[FailureDescriptors.MAX_STEPS_REACHED] or checks[FailureDescriptors.ANGLE_LEFT] or checks[FailureDescriptors.ANGLE_RIGHT]:
+        if checks[FailureDescriptors.MAX_STEPS_REACHED]: #or checks[FailureDescriptors.ANGLE_LEFT] or checks[FailureDescriptors.ANGLE_RIGHT]:
             # to speed up end
             self.failure_id = True
 
@@ -336,7 +336,7 @@ class ExperimentalCartpoleEnv(gym.Env):
 
         # Set max velocity
         logger.info("Setting max velocity")
-        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=10_000, actobs_tracker=2)
+        max_velo_pkt = SetMaxVelocityPacket(SetOperation.EQUAL, cart_id=CartID.ONE, value=12_000, actobs_tracker=2) # 10000 is safe - issue is that at max velocity steppers don't seem to stop immediately at softlimits
         self.network_manager.send_packet(max_velo_pkt)
 
         # Set velocity
