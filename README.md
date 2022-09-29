@@ -17,6 +17,7 @@ An in-sillica approach is also done in Python, though the experimental part of t
 ## Proof of concept
 
 https://user-images.githubusercontent.com/107655543/193061080-daaa69d9-861b-4e1c-b14c-a2ea745fbae2.mp4
+
 The video demonstrates the ability of the setup to swing-up (albeit rather inefficiently!) and switch to a PID controller, using the "swingup_to_pid_demo.py" script. It should be noted that a more robust swing-up method is needed to ensure 100% reproducibility since the PID is sometimes unable to 'catch' the pole and remain stable.
 
 The folder "commander" contains a Cartpole environment to be used in the same way as the gym API.
