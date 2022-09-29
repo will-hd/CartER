@@ -10,9 +10,15 @@ This branch is a refactored version of Jeppe's work that considers only a single
 
 The observation space also includes the rotational position for each pendulum, which is measured using magnetic rotary encoders.
 
-The goal is to use Reinforcement Learning (RL) algorithms to accomplish certain tasks (for example, balancing or swing-up) for increasingly difficult mechanical configurations that may include springs connecting the two pendula.
+The goal is to use Reinforcement Learning (RL) algorithms to accomplish certain physical tasks (for example, balancing or swing-up) for increasingly difficult mechanical configurations that could involve multiple pendula coupled by springs. 
 
-An in-sillica approach is also done in Python, though the experimental part of the project is an important part and the simulated approach is only complementary.
+## Environment and files
+
+The folder "commander" contains a Cartpole environment to be used in the same way as the gym API. The environment can be called by importing `from commander.ml.environment import ExperimentalCartpoleEnv` and then instantiating.
+
+For the physical system, the gym 0.21.0 API calls are equivalent: `env.step()` performs an action and returns an observation and `env.reset()` performs a reset of the hardware and waits for the system to settle.
+
+The branch CartER-single includes two main files "q_learning.py" and "swingup_to_pid_demo.py" to be run, and no CLI is used yet as is the case in Jeppe's original work. At the time of writing, the setup is configured such that the swingup_to_pid_demo.py should work out of the box. Small tweaks may be needed for "q_learning.py" to run correctly (such as ensuring the observation size returned is expected by the algorithm).
 
 ## Proof of concept
 
@@ -20,9 +26,10 @@ https://user-images.githubusercontent.com/107655543/193061080-daaa69d9-861b-4e1c
 
 The video demonstrates the ability of the setup to swing-up (albeit rather inefficiently!) and switch to a PID controller, using the "swingup_to_pid_demo.py" script. It should be noted that a more robust swing-up method is needed to ensure 100% reproducibility since the PID is sometimes unable to 'catch' the pole and remain stable.
 
-The folder "commander" contains a Cartpole environment to be used in the same way as the gym API.
+Using the Q-Learning algorithm in "q_learning.py" with a reward function that favours the cart being central (with no consideration of the pole angle), such as a $sin^4(x)$ function, the system was able to learn (see demo image): 
 
-The forked branch CartER-single includes two main files "q_learning.py" and "swingup_to_pid_demo.py". At the time of writing, the setup is configured such that the swingup_to_pid_demo.py should work out of the box. Small tweaks may be needed for "q_learning.py" to run correctly (such as ensuring the obervation size returned is expected by the alogrithm.
+![BOUNCE_Q_Learning_TRIAL](https://user-images.githubusercontent.com/107655543/193065077-0ce8271d-37f6-47cf-8d50-76ac16d67d90.png)
+
 
 ## Build system
 
