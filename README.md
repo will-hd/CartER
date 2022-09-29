@@ -16,6 +16,8 @@ An in-sillica approach is also done in Python, though the experimental part of t
 
 ## Proof of concept
 
+https://user-images.githubusercontent.com/107655543/193059563-f359427b-b478-4a39-b5ee-ea20390d01b1.mp4
+
 The folder "commander" contains a Cartpole environment to be used in the same way as the gym API.
 
 The forked branch CartER-single includes two main files "q_learning.py" and "swingup_to_pid_demo.py". At the time of writing, the setup is configured such that the swingup_to_pid_demo.py should work out of the box. Small tweaks may be needed for "q_learning.py" to run correctly (such as ensuring the obervation size returned is expected by the alogrithm.
